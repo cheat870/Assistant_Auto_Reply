@@ -13,15 +13,19 @@ export function createHttpServer(bot: Bot<BotContext>): http.Server {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
 
-    // GET /health - Liveness probe
-    if (req.method === 'GET' && url.pathname === '/health') {
+    // GET /health or HEAD /health (and root /) - Liveness probe
+    if ((req.method === 'GET' || req.method === 'HEAD') && (url.pathname === '/health' || url.pathname === '/')) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok' }));
+      if (req.method === 'HEAD') {
+        res.end();
+      } else {
+        res.end(JSON.stringify({ status: 'ok' }));
+      }
       return;
     }
 
-    // GET /ready - Readiness probe (checks Database, Redis, and Bot)
-    if (req.method === 'GET' && url.pathname === '/ready') {
+    // GET /ready or HEAD /ready - Readiness probe (checks Database, Redis, and Bot)
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/ready') {
       let dbOk = false;
       let redisOk = false;
 
