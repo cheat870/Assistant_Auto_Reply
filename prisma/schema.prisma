@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MatchType {
+  EXACT
+  CONTAINS
+  STARTS_WITH
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  UNKNOWN
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  DELETED
+  IGNORED
+  ERROR
+}
+
+enum ScannerStatus {
+  NOT_SCANNED
+  NOT_CONFIGURED
+  PENDING_SCAN
+  CLEAN
+  SUSPICIOUS
+  MALICIOUS
+  UNKNOWN
+}
+
+enum AuditAction {
+  FILE_DETECTED
+  FILE_ANALYZED
+  FILE_APPROVED
+  FILE_DELETED
+  FILE_IGNORED
+  KEYWORD_CREATED
+  KEYWORD_UPDATED
+  KEYWORD_DELETED
+  EXTENSION_ADDED
+  EXTENSION_REMOVED
+  SETTINGS_CHANGED
+}
+
+model User {
+  id            String         @id @default(cuid())
+  telegramId    BigInt         @unique
+  username      String?
+  firstName     String?
+  lastName      String?
+  isBot         Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  fileEvents    FileEvent[]
+  messageEvents MessageEvent[]
+
+  @@index([telegramId])
+}
+
+model Admin {
+  id         String   @id @default(cuid())
+  telegramId BigInt   @unique
+  username   String?
+  role       String   @default("ADMIN")
+  addedBy    BigInt?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([telegramId])
+}
+
+model Chat {
+  id                        String         @id @default(cuid())
+  telegramChatId            BigInt         @unique
+  type                      String         // "private", "group", "supergroup", "channel"
+  title                     String?
+  username                  String?
+  autoReplyEnabled          Boolean        @default(true)
+  fileProtectionEnabled     Boolean        @default(true)
+  archiveScanningEnabled    Boolean        @default(true)
+  adminNotificationsEnabled Boolean        @default(true)
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
+  keywords                  Keyword[]
+  fileEvents                FileEvent[]
+  messageEvents             MessageEvent[]
+
+  @@index([telegramChatId])
+}
+
+model Keyword {
+  id        String    @id @default(cuid())
+  chatId    String?
+  chat      Chat?     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  keyword   String
+  reply     String
+  matchType MatchType @default(CONTAINS)
+  priority  Int       @default(10)
+  enabled   Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([keyword])
+  @@index([chatId])
+}
+
+model AutoReply {
+  id          String   @id @default(cuid())
+  chatId      String?
+  triggerType String   @default("FALLBACK") // "FALLBACK", "WELCOME"
+  content     String
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BlockedExtension {
+  id          String    @id @default(cuid())
+  extension   String    @unique // e.g. ".exe", ".bat", lowercase with leading dot
+  description String?
+  riskDefault RiskLevel @default(HIGH)
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([extension])
+}
+
+model FileEvent {
+  id                  String        @id @default(cuid())
+  chatId              String        // Telegram Chat ID as string
+  chatRef             Chat?         @relation(fields: [chatDbId], references: [id])
+  chatDbId            String?
+  userId              String        // Telegram User ID as string
+  userRef             User?         @relation(fields: [userDbId], references: [id])
+  userDbId            String?
+  messageId           Int           // Telegram Message ID in target chat
+  filename            String
+  extension           String
+  mimeType            String?
+  size                BigInt        // File size in bytes
+  sha256              String
+  fileType            String?       // "PE32+ executable", "ZIP Archive", etc.
+  architecture        String?       // "x64", "x86", etc.
+  digitalSignature    String?       // "Present", "Not detected"
+  riskLevel           RiskLevel     @default(HIGH)
+  scannerStatus       ScannerStatus @default(NOT_CONFIGURED)
+  scannerResult       String?
+  indicators          String        // JSON array string
+  impactSummary       String        // JSON array string
+  status              ReviewStatus  @default(PENDING)
+  adminAlertMessageId Int?          // Telegram Message ID of the alert in Admin chat/channel
+  reviewedBy          BigInt?       // Telegram ID of reviewer
+  reviewedAt          DateTime?
+  reviewNotes         String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([chatId, messageId])
+  @@index([sha256])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model MessageEvent {
+  id                String   @id @default(cuid())
+  telegramMessageId Int
+  chatId            String
+  chatRef           Chat?    @relation(fields: [chatDbId], references: [id])
+  chatDbId          String?
+  userId            String
+  userRef           User?    @relation(fields: [userDbId], references: [id])
+  userDbId          String?
+  messageType       String   // "text", "document", "photo", "video", etc.
+  textPreview       String?
+  autoReplied       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@index([chatId])
+  @@index([userId])
+}
+
+model BotSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@index([key])
+}
+
+model AuditLog {
+  id              String      @id @default(cuid())
+  adminTelegramId BigInt?
+  action          AuditAction
+  targetType      String      // "FileEvent", "Keyword", "BlockedExtension", "Chat", etc.
+  targetId        String?
+  metadata        String?     // JSON metadata string
+  createdAt       DateTime    @default(now())
+
+  @@index([adminTelegramId])
+  @@index([action])
+  @@index([createdAt])
+}
