@@ -74,7 +74,7 @@ export function createHttpServer(bot: Bot<BotContext>): http.Server {
       let restError: string | null = null;
       if (apiKey) {
         try {
-          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${apiKey}`;
           const resp = await fetch(testUrl, {
             method: 'POST',
             headers: {

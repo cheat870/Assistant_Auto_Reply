@@ -47,9 +47,10 @@ export class AiService {
     const env = getEnv();
     const candidateModels = [
       env.GEMINI_MODEL,
-      'gemini-2.0-flash',
+      'gemini-3.8-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.8-pro',
       'gemini-2.5-flash',
-      'gemini-1.5-flash',
     ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
     let lastError: any = null;

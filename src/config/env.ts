@@ -79,7 +79,7 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform(v => (v ? v.replace(/[\r\n\s]+/g, '').trim() : undefined)),
-  GEMINI_MODEL: z.string().default('gemini-2.0-flash'),
+  GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
   AI_AUTO_REPLY_ENABLED: z
     .string()
     .default('true')
