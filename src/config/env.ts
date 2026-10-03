@@ -75,7 +75,10 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().default(10),
 
   // Google Gemini AI Configuration
-  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z
+    .string()
+    .optional()
+    .transform(v => (v ? v.replace(/[\r\n\s]+/g, '').trim() : undefined)),
   GEMINI_MODEL: z.string().default('gemini-2.0-flash'),
   AI_AUTO_REPLY_ENABLED: z
     .string()
@@ -83,7 +86,10 @@ const envSchema = z.object({
     .transform(v => v.toLowerCase() === 'true'),
 
   // VirusTotal Threat Intelligence Configuration
-  VIRUSTOTAL_API_KEY: z.string().optional(),
+  VIRUSTOTAL_API_KEY: z
+    .string()
+    .optional()
+    .transform(v => (v ? v.replace(/[\r\n\s]+/g, '').trim() : undefined)),
 
   // Cloud Quarantine Storage (Cloudflare R2 / AWS S3)
   QUARANTINE_STORAGE_ENABLED: z

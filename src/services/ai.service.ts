@@ -53,20 +53,76 @@ export class AiService {
     ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
     let lastError: any = null;
+
+    // 1. Try via official Google GenAI SDK
     for (const model of candidateModels) {
       try {
         const response = await ai.models.generateContent({
           model,
           contents,
         });
-        return response;
+        if (response && response.text) {
+          return response;
+        }
       } catch (err: any) {
         lastError = err;
-        logger.warn({ model, errMsg: err?.message || String(err) }, 'Gemini model attempt failed, trying fallback');
+        logger.warn({ model, errMsg: err?.message || String(err) }, 'Gemini SDK model attempt failed, trying fallback');
       }
     }
 
-    logger.error({ lastError: lastError?.message || lastError }, 'All Gemini candidate models failed');
+    // 2. Direct REST Fallback (Direct HTTPS fetch with x-goog-api-key and ?key=)
+    const apiKey = env.GEMINI_API_KEY?.trim();
+    if (apiKey) {
+      for (const model of candidateModels) {
+        try {
+          const restUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+          let parts: any[] = [];
+          if (typeof contents === 'string') {
+            parts = [{ text: contents }];
+          } else if (Array.isArray(contents)) {
+            parts = contents.map(item => {
+              if (item.text) return { text: item.text };
+              if (item.inlineData) {
+                return {
+                  inline_data: {
+                    mime_type: item.inlineData.mimeType,
+                    data: item.inlineData.data,
+                  },
+                };
+              }
+              return item;
+            });
+          }
+
+          const restRes = await fetch(restUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              contents: [{ parts }],
+            }),
+          });
+
+          if (restRes.ok) {
+            const data = (await restRes.json()) as any;
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              return { text };
+            }
+          } else {
+            const errBody = await restRes.text().catch(() => '');
+            logger.warn({ model, status: restRes.status, errBody }, 'Gemini Direct REST returned error');
+          }
+        } catch (fetchErr: any) {
+          logger.warn({ model, fetchErr: fetchErr?.message || String(fetchErr) }, 'Gemini Direct REST fetch error');
+        }
+      }
+    }
+
+    logger.error({ lastError: lastError?.message || lastError }, 'All Gemini SDK and REST candidate models failed');
     return null;
   }
 
