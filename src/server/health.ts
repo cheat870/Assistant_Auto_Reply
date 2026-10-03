@@ -2,7 +2,6 @@ import http from 'node:http';
 import { webhookCallback, type Bot } from 'grammy';
 import { getEnv } from '../config/env.js';
 import { prisma } from '../database/prisma.js';
-import { aiService } from '../services/ai.service.js';
 import { rateLimitService } from '../services/rateLimit.service.js';
 import type { BotContext } from '../types/index.js';
 import { logger } from '../utils/logger.js';
@@ -63,17 +62,34 @@ export function createHttpServer(bot: Bot<BotContext>): http.Server {
     // GET /diag - Diagnostic endpoint for AI and threat intelligence
     if (req.method === 'GET' && url.pathname === '/diag') {
       const prompt = url.searchParams.get('q') || '1+2=';
-      const keyPresent = Boolean(env.GEMINI_API_KEY);
-      const keyLength = env.GEMINI_API_KEY ? env.GEMINI_API_KEY.length : 0;
-      const keyPrefix = env.GEMINI_API_KEY ? env.GEMINI_API_KEY.substring(0, 8) + '...' : 'none';
+      const apiKey = env.GEMINI_API_KEY ? env.GEMINI_API_KEY.replace(/[\r\n\s]+/g, '').trim() : '';
+      const keyPresent = Boolean(apiKey);
+      const keyLength = apiKey.length;
+      const keyPrefix = keyPresent ? apiKey.substring(0, 10) + '...' : 'none';
       const vtPresent = Boolean(env.VIRUSTOTAL_API_KEY);
 
-      let aiResult: any = null;
-      let aiError: string | null = null;
-      try {
-        aiResult = await aiService.generateSmartAutoReply(prompt, 'Tester');
-      } catch (err: any) {
-        aiError = err?.message || String(err);
+      // Direct REST test to capture exact Google response
+      let restStatus = 0;
+      let restData: any = null;
+      let restError: string | null = null;
+      if (apiKey) {
+        try {
+          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+          const resp = await fetch(testUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+            }),
+          });
+          restStatus = resp.status;
+          restData = await resp.json().catch(() => resp.statusText);
+        } catch (err: any) {
+          restError = err?.message || String(err);
+        }
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -84,10 +100,10 @@ export function createHttpServer(bot: Bot<BotContext>): http.Server {
           geminiKeyPrefix: keyPrefix,
           geminiModel: env.GEMINI_MODEL,
           virusTotalConfigured: vtPresent,
-          testPrompt: prompt,
-          aiResponse: aiResult,
-          aiError,
-        })
+          restStatus,
+          restData,
+          restError,
+        }, null, 2)
       );
       return;
     }
