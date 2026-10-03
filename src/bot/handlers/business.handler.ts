@@ -1,4 +1,5 @@
 import { getEnv } from '../../config/env.js';
+import { aiService } from '../../services/ai.service.js';
 import { autoReplyService } from '../../services/autoReply.service.js';
 import type { BotContext } from '../../types/index.js';
 import { auditLogger, logger } from '../../utils/logger.js';
@@ -48,6 +49,26 @@ export async function handleBusinessTextMessage(ctx: BotContext): Promise<void> 
     return;
   }
 
+  // 1. Try Gemini AI smart reply on behalf of SOCHEAT
+  if (aiService.isAvailable() && env.AI_AUTO_REPLY_ENABLED) {
+    try {
+      const senderName = msg.from?.first_name || 'ភ្ញៀវ';
+      const aiReply = await aiService.generateSmartAutoReply(text, senderName);
+      if (aiReply) {
+        await ctx.reply(aiReply, {
+          business_connection_id: msg.business_connection_id,
+          reply_to_message_id: msg.message_id,
+          parse_mode: 'HTML',
+        });
+        auditLogger.autoReplySent(msg.chat.id, 'GEMINI_AI', 'BUSINESS_AI_GENERATED');
+        return;
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Gemini AI business reply failed, falling back to standard auto-reply');
+    }
+  }
+
+  // 2. Fallback to standard busy auto-reply
   const match = await autoReplyService.findReply(text, String(msg.chat.id));
   if (match) {
     try {

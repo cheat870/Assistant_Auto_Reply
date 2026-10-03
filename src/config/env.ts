@@ -73,6 +73,28 @@ const envSchema = z.object({
 
   RATE_LIMIT_USER_MESSAGES: z.coerce.number().default(10),
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().default(10),
+
+  // Google Gemini AI Configuration
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  AI_AUTO_REPLY_ENABLED: z
+    .string()
+    .default('true')
+    .transform(v => v.toLowerCase() === 'true'),
+
+  // VirusTotal Threat Intelligence Configuration
+  VIRUSTOTAL_API_KEY: z.string().optional(),
+
+  // Cloud Quarantine Storage (Cloudflare R2 / AWS S3)
+  QUARANTINE_STORAGE_ENABLED: z
+    .string()
+    .default('false')
+    .transform(v => v.toLowerCase() === 'true'),
+  S3_ENDPOINT: z.string().optional(),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY: z.string().optional(),
+  S3_SECRET_KEY: z.string().optional(),
+  S3_REGION: z.string().default('auto'),
 });
 
 export type Env = z.infer<typeof envSchema>;

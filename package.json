@@ -15,6 +15,7 @@
     "db:generate": "prisma generate"
   },
   "dependencies": {
+    "@google/genai": "^2.27.0",
     "@grammyjs/runner": "^2.0.3",
     "@prisma/client": "^6.4.1",
     "@types/node": "^22.13.5",

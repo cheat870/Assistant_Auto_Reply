@@ -63,3 +63,60 @@ export class NullExternalScanner implements ExternalThreatScanner {
     };
   }
 }
+
+export class VirusTotalScanner implements ExternalThreatScanner {
+  readonly name = 'VirusTotal v3 Intelligence';
+
+  async scanFile(_filePath: string, sha256: string): Promise<ScanResult> {
+    return this.checkHash(sha256);
+  }
+
+  async checkHash(sha256: string): Promise<ScanResult> {
+    const { virusTotalService } = await import('./virusTotal.service.js');
+    const report = await virusTotalService.getFileReport(sha256);
+    if (!report || !report.isConfigured) {
+      return {
+        scannerName: this.name,
+        status: 'NOT_CONFIGURED',
+        details: 'VirusTotal API key not configured',
+        scanTime: new Date(),
+      };
+    }
+
+    if (!report.isFound) {
+      return {
+        scannerName: this.name,
+        status: 'UNKNOWN',
+        details: 'Hash not seen in VirusTotal (new or unique sample)',
+        scanTime: new Date(),
+      };
+    }
+
+    if (report.threatVerdict === 'MALICIOUS') {
+      return {
+        scannerName: this.name,
+        status: 'MALICIOUS',
+        threatName: report.topDetections[0] || 'Malware detected',
+        details: `${report.maliciousCount}/${report.totalEngines} AV engines flagged as malicious`,
+        scanTime: new Date(),
+      };
+    }
+
+    if (report.threatVerdict === 'SUSPICIOUS') {
+      return {
+        scannerName: this.name,
+        status: 'SUSPICIOUS',
+        threatName: report.topDetections[0] || 'Suspicious heuristics',
+        details: `${report.suspiciousCount + report.maliciousCount}/${report.totalEngines} AV engines flagged as suspicious`,
+        scanTime: new Date(),
+      };
+    }
+
+    return {
+      scannerName: this.name,
+      status: 'CLEAN',
+      details: `Clean (0/${report.totalEngines} AV engines flagged)`,
+      scanTime: new Date(),
+    };
+  }
+}

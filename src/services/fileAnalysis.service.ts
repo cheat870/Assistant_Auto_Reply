@@ -19,12 +19,12 @@ import { auditLogger } from '../utils/logger.js';
 import { checkMimeDiscrepancy, identifyFileSignature } from '../utils/mime.js';
 import { analyzeArchiveFile } from './archiveScanner.service.js';
 import { analyzePEFile } from './peAnalyzer.service.js';
-import { NullExternalScanner } from './scanner.interface.js';
+import { VirusTotalScanner, type ExternalThreatScanner } from './scanner.interface.js';
 import { analyzeScriptFile } from './scriptAnalyzer.service.js';
 import { t, getLocalizedRiskLabel, type Locale } from '../i18n/index.js';
 
 export class FileAnalysisService {
-  private scanner = new NullExternalScanner();
+  private scanner: ExternalThreatScanner = new VirusTotalScanner();
 
   /**
    * Executes complete, safe static analysis on an uploaded file.

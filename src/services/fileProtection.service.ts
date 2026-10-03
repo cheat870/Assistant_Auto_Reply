@@ -10,6 +10,7 @@ import { auditLogger, logger } from '../utils/logger.js';
 import { cleanupTempDir, createIsolatedTempDir, withTimeout } from '../utils/security.js';
 import { FileAnalysisService } from './fileAnalysis.service.js';
 import { notificationService } from './notification.service.js';
+import { quarantineStorageService } from './quarantineStorage.service.js';
 import { getChatLanguage } from '../i18n/index.js';
 
 export class FileProtectionService {
@@ -111,6 +112,13 @@ export class FileProtectionService {
         this.analysisService.analyzeFile(tempFilePath, sanitizedName, mimeType),
         env.FILE_SCAN_TIMEOUT_SECONDS,
         'File static analysis'
+      );
+
+      // 3.5 Safely quarantine suspicious file
+      await quarantineStorageService.quarantineFile(
+        sanitizedName,
+        Buffer.from(arrayBuffer),
+        analysisResult.sha256
       );
 
       // 4. Save FileEvent in database with status PENDING

@@ -33,7 +33,11 @@ import {
   handleMenuCommand,
   handleStartCommand,
 } from './commands/user.command.js';
-import { handleAudioOrVideoMessage, handleDocumentMessage } from './handlers/file.handler.js';
+import {
+  handleAudioOrVideoMessage,
+  handleDocumentMessage,
+  handlePhotoMessage,
+} from './handlers/file.handler.js';
 import { handleBusinessConnection, handleBusinessTextMessage } from './handlers/business.handler.js';
 import { handleTextMessage } from './handlers/message.handler.js';
 import { authMiddleware, requireAdmin } from './middleware/auth.middleware.js';
@@ -113,6 +117,8 @@ export function createBot(): Bot<BotContext> {
   // Message Handlers
   bot.on('business_connection', handleBusinessConnection);
   bot.on('business_message:text', handleBusinessTextMessage);
+  bot.on('business_message:photo', handlePhotoMessage);
+  bot.on('message:photo', handlePhotoMessage);
   bot.on('message:document', handleDocumentMessage);
   bot.on(
     ['message:video', 'message:audio', 'message:voice', 'message:video_note'],
