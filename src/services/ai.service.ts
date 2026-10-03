@@ -38,6 +38,39 @@ export class AiService {
   }
 
   /**
+   * Tries multiple Gemini models with fallback (e.g. gemini-2.0-flash, gemini-2.5-flash, gemini-1.5-flash)
+   */
+  private async generateWithFallback(contents: any): Promise<any> {
+    const ai = this.getClient();
+    if (!ai) return null;
+
+    const env = getEnv();
+    const candidateModels = [
+      env.GEMINI_MODEL,
+      'gemini-2.0-flash',
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+    ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
+
+    let lastError: any = null;
+    for (const model of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents,
+        });
+        return response;
+      } catch (err: any) {
+        lastError = err;
+        logger.warn({ model, errMsg: err?.message || String(err) }, 'Gemini model attempt failed, trying fallback');
+      }
+    }
+
+    logger.error({ lastError: lastError?.message || lastError }, 'All Gemini candidate models failed');
+    return null;
+  }
+
+  /**
    * Generates a context-aware polite auto-reply using Gemini AI.
    * Answers user's question in natural Khmer/English and clarifies Socheat is currently occupied.
    */
@@ -45,9 +78,6 @@ export class AiService {
     userText: string,
     senderName: string = 'ភ្ញៀវ'
   ): Promise<string | null> {
-    const ai = this.getClient();
-    if (!ai) return null;
-
     const env = getEnv();
     if (!env.AI_AUTO_REPLY_ENABLED) return null;
 
@@ -59,7 +89,7 @@ The user "${senderName}" just sent this message:
 
 Instructions:
 1. Respond politely, helpfully, and concisely in natural Cambodian Khmer (or English if the user wrote in English).
-2. If the user asks a question (such as prices, services, greeting, status), provide a helpful, courteous response.
+2. If the user asks a question (such as prices, services, greeting, status, or basic math/queries), provide a direct, helpful, and courteous response.
 3. Inform the user respectfully that SOCHEAT is currently occupied and will reply personally as soon as available.
 4. Keep the tone friendly, professional, and trustworthy.
 5. End the reply with:
@@ -67,12 +97,8 @@ Instructions:
 
 Output only the reply text formatted cleanly for Telegram.`;
 
-      const response = await ai.models.generateContent({
-        model: env.GEMINI_MODEL,
-        contents: prompt,
-      });
-
-      return response.text?.trim() || null;
+      const response = await this.generateWithFallback(prompt);
+      return response?.text?.trim() || null;
     } catch (err) {
       logger.error({ err }, 'Gemini AI Smart Auto-Reply generation failed');
       return null;
@@ -86,10 +112,6 @@ Output only the reply text formatted cleanly for Telegram.`;
     audioBuffer: Buffer,
     mimeType: string = 'audio/ogg'
   ): Promise<VoiceTranscription | null> {
-    const ai = this.getClient();
-    if (!ai) return null;
-
-    const env = getEnv();
     try {
       const prompt = `
 Please listen to this audio message carefully and:
@@ -104,20 +126,18 @@ Respond in JSON format with fields:
   "summaryKhmer": "សេចក្តីសង្ខេបខ្លីនៃសារសំឡេងជាភាសាខ្មែរ"
 }`;
 
-      const response = await ai.models.generateContent({
-        model: env.GEMINI_MODEL,
-        contents: [
-          {
-            inlineData: {
-              data: audioBuffer.toString('base64'),
-              mimeType,
-            },
+      const response = await this.generateWithFallback([
+        {
+          inlineData: {
+            data: audioBuffer.toString('base64'),
+            mimeType,
           },
-          { text: prompt },
-        ],
-      });
+        },
+        { text: prompt },
+      ]);
 
-      const raw = response.text || '';
+      const raw = response?.text || '';
+      if (!raw) return null;
       const cleanJson = raw.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
 
@@ -139,10 +159,6 @@ Respond in JSON format with fields:
     imageBuffer: Buffer,
     mimeType: string = 'image/jpeg'
   ): Promise<BankSlipAnalysis | null> {
-    const ai = this.getClient();
-    if (!ai) return null;
-
-    const env = getEnv();
     try {
       const prompt = `
 Analyze this image to determine if it is a bank transfer slip or payment receipt (e.g. ABA Bank, Bakong KHQR, ACLEDA, Wing, Canadia Bank, etc.).
@@ -161,20 +177,18 @@ Extract the details accurately into JSON:
 }
 If this image is not a payment receipt/bank slip, set "isBankSlip": false and "status": "NOT_A_SLIP".`;
 
-      const response = await ai.models.generateContent({
-        model: env.GEMINI_MODEL,
-        contents: [
-          {
-            inlineData: {
-              data: imageBuffer.toString('base64'),
-              mimeType,
-            },
+      const response = await this.generateWithFallback([
+        {
+          inlineData: {
+            data: imageBuffer.toString('base64'),
+            mimeType,
           },
-          { text: prompt },
-        ],
-      });
+        },
+        { text: prompt },
+      ]);
 
-      const raw = response.text || '';
+      const raw = response?.text || '';
+      if (!raw) return null;
       const cleanJson = raw.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed: BankSlipAnalysis = JSON.parse(cleanJson);
       return parsed;
