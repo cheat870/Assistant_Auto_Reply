@@ -1,5 +1,6 @@
 import type { NextFunction } from 'grammy';
 import { chatRepository } from '../../database/repositories/chat.repository.js';
+import { messageRepository } from '../../database/repositories/message.repository.js';
 import { userRepository } from '../../database/repositories/user.repository.js';
 import type { BotContext } from '../../types/index.js';
 import { auditLogger, logger } from '../../utils/logger.js';
@@ -7,7 +8,6 @@ import { auditLogger, logger } from '../../utils/logger.js';
 export async function loggerMiddleware(ctx: BotContext, next: NextFunction): Promise<void> {
   const from = ctx.from;
   const chat = ctx.chat;
-  const message = ctx.message;
 
   if (from) {
     userRepository
@@ -32,30 +32,53 @@ export async function loggerMiddleware(ctx: BotContext, next: NextFunction): Pro
       .catch(err => logger.warn({ err }, 'Failed to upsert chat'));
   }
 
-  if (message && chat && from) {
-    auditLogger.messageReceived(chat.id, from.id, message.message_id);
+  const incomingMsg = ctx.message || ctx.businessMessage;
 
-    const messageType = message.document
+  if (incomingMsg && chat && from) {
+    auditLogger.messageReceived(chat.id, from.id, incomingMsg.message_id);
+
+    const messageType = incomingMsg.document
       ? 'document'
-      : message.photo
+      : incomingMsg.photo
         ? 'photo'
-        : message.video
-          ? 'video'
-          : message.audio
-            ? 'audio'
-            : message.text
-              ? 'text'
-              : 'other';
+        : incomingMsg.voice
+          ? 'voice'
+          : incomingMsg.video
+            ? 'video'
+            : incomingMsg.audio
+              ? 'audio'
+              : incomingMsg.text
+                ? 'text'
+                : 'other';
 
-    userRepository
-      .recordMessage({
-        telegramMessageId: message.message_id,
+    const fullText = incomingMsg.text || incomingMsg.caption || undefined;
+    const mediaFileId = incomingMsg.photo
+      ? incomingMsg.photo[incomingMsg.photo.length - 1]?.file_id
+      : incomingMsg.voice
+        ? incomingMsg.voice.file_id
+        : incomingMsg.document
+          ? incomingMsg.document.file_id
+          : incomingMsg.video
+            ? incomingMsg.video.file_id
+            : incomingMsg.audio
+              ? incomingMsg.audio.file_id
+              : undefined;
+
+    const senderName =
+      [from.first_name, from.last_name].filter(Boolean).join(' ') || from.username || undefined;
+
+    messageRepository
+      .saveMessage({
+        telegramMessageId: incomingMsg.message_id,
         chatId: chat.id.toString(),
         userId: from.id.toString(),
+        senderName,
+        senderUsername: from.username,
         messageType,
-        textPreview: message.text || message.caption,
+        fullText,
+        mediaFileId,
       })
-      .catch(err => logger.warn({ err }, 'Failed to record message event'));
+      .catch(err => logger.warn({ err }, 'Failed to record message in messageRepository'));
   }
 
   await next();

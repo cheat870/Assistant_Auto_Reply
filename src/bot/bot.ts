@@ -40,6 +40,12 @@ import {
 } from './handlers/file.handler.js';
 import { handleBusinessConnection, handleBusinessTextMessage } from './handlers/business.handler.js';
 import { handleTextMessage } from './handlers/message.handler.js';
+import {
+  handleDeletedBusinessMessages,
+  handleDeletedCommand,
+  handleEditedBusinessMessage,
+  handleEditedMessage,
+} from './handlers/messageEvent.handler.js';
 import { authMiddleware, requireAdmin } from './middleware/auth.middleware.js';
 import { loggerMiddleware } from './middleware/logger.middleware.js';
 import { rateLimitMiddleware } from './middleware/rateLimit.middleware.js';
@@ -95,6 +101,7 @@ export function createBot(): Bot<BotContext> {
   bot.command('settings', requireAdmin, handleSettingsCommand);
   bot.command('logs', requireAdmin, handleLogsCommand);
   bot.command('busy', requireAdmin, handleBusyCommand);
+  bot.command(['deleted', 'deleted_messages'], requireAdmin, handleDeletedCommand);
 
   // Keyword Management Commands
   bot.command('keywords', requireAdmin, handleKeywordsCommand);
@@ -116,6 +123,9 @@ export function createBot(): Bot<BotContext> {
 
   // Message Handlers
   bot.on('business_connection', handleBusinessConnection);
+  bot.on('deleted_business_messages', handleDeletedBusinessMessages);
+  bot.on('edited_business_message', handleEditedBusinessMessage);
+  bot.on('edited_message', handleEditedMessage);
   bot.on('business_message:text', handleBusinessTextMessage);
   bot.on('business_message:photo', handlePhotoMessage);
   bot.on('message:photo', handlePhotoMessage);

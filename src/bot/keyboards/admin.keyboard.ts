@@ -13,7 +13,9 @@ export function getAdminPanelKeyboard(locale: Locale = 'km'): InlineKeyboard {
     .text(t('panel_btn_stats', locale), 'admin:stats')
     .row()
     .text(t('panel_btn_settings', locale), 'admin:settings')
-    .text(t('panel_btn_logs', locale), 'admin:logs');
+    .text(t('panel_btn_logs', locale), 'admin:logs')
+    .row()
+    .text(locale === 'km' ? '🗑️ សារដែលគេលុប' : '🗑️ Deleted Messages', 'admin:deleted');
 }
 
 export function getBackToAdminKeyboard(locale: Locale = 'km'): InlineKeyboard {

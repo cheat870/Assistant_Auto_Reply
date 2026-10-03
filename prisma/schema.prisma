@@ -174,21 +174,32 @@ model FileEvent {
 }
 
 model MessageEvent {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   telegramMessageId Int
   chatId            String
-  chatRef           Chat?    @relation(fields: [chatDbId], references: [id])
+  chatRef           Chat?     @relation(fields: [chatDbId], references: [id])
   chatDbId          String?
   userId            String
-  userRef           User?    @relation(fields: [userDbId], references: [id])
+  userRef           User?     @relation(fields: [userDbId], references: [id])
   userDbId          String?
-  messageType       String   // "text", "document", "photo", "video", etc.
+  senderName        String?
+  senderUsername    String?
+  messageType       String    // "text", "document", "photo", "video", "voice", etc.
   textPreview       String?
-  autoReplied       Boolean  @default(false)
-  createdAt         DateTime @default(now())
+  fullText          String?   // Complete text/caption content
+  mediaFileId       String?   // Telegram file_id for deleted photo/voice/document recovery
+  isDeleted         Boolean   @default(false)
+  deletedAt         DateTime?
+  isEdited          Boolean   @default(false)
+  editedAt          DateTime?
+  originalText      String?   // Content before edit
+  autoReplied       Boolean   @default(false)
+  createdAt         DateTime  @default(now())
 
+  @@index([chatId, telegramMessageId])
   @@index([chatId])
   @@index([userId])
+  @@index([isDeleted])
 }
 
 model BotSetting {

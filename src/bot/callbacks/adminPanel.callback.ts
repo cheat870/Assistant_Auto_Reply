@@ -1,5 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { getChatLanguage, t } from '../../i18n/index.js';
+import { messageRepository } from '../../database/repositories/message.repository.js';
 import { adminService } from '../../services/admin.service.js';
 import { autoReplyService } from '../../services/autoReply.service.js';
 import type { BotContext } from '../../types/index.js';
@@ -193,6 +194,35 @@ export async function handleAdminPanelCallback(ctx: BotContext): Promise<void> {
         text += `• <b>[${l.action}]</b>: ${l.targetType} (<code>${l.targetId || ''}</code>)\n`;
       });
       text += locale === 'km' ? `\nប្រើ <code>/logs</code> ដើម្បីមើលប្រវត្តិពេញលេញ។` : `\nUse <code>/logs</code> for full history.`;
+
+      await ctx.editMessageText(text, {
+        parse_mode: 'HTML',
+        reply_markup: getBackToAdminKeyboard(locale),
+      });
+      break;
+    }
+
+    case 'deleted': {
+      const deletedMessages = await messageRepository.getRecentDeleted(10);
+      let text = '';
+      if (deletedMessages.length === 0) {
+        text =
+          locale === 'km'
+            ? '📋 <b>ប្រវត្តិសារដែលត្រូវបានលុប (Deleted Messages):</b>\n\n<i>មិនទាន់មានសារដែលត្រូវបានលុបត្រូវបានរកឃើញនៅឡើយទេ។</i>'
+            : '📋 <b>Deleted Messages:</b>\n\n<i>No deleted messages recorded yet.</i>';
+      } else {
+        const header =
+          locale === 'km'
+            ? `📋 <b>ប្រវត្តិសារដែលបានលុបចុងក្រោយ (${deletedMessages.length}):</b>\n\n`
+            : `📋 <b>Recently Deleted Messages (${deletedMessages.length}):</b>\n\n`;
+        const items = deletedMessages.map((m, idx) => {
+          const sender = m.senderName || 'Anonymous';
+          const time = m.deletedAt ? m.deletedAt.toLocaleTimeString('km-KH') : m.createdAt.toLocaleTimeString('km-KH');
+          const preview = m.fullText ? m.fullText.substring(0, 80) : `[${m.messageType}]`;
+          return `<b>${idx + 1}. ${sender}</b> (⏰ ${time})\n<blockquote>${preview.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</blockquote>`;
+        });
+        text = header + items.join('\n\n') + (locale === 'km' ? '\n\nប្រើ <code>/deleted</code> សម្រាប់មើលលម្អិត។' : '\n\nUse <code>/deleted</code> for details.');
+      }
 
       await ctx.editMessageText(text, {
         parse_mode: 'HTML',

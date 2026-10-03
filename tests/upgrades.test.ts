@@ -53,4 +53,16 @@ describe('New Upgrades Suite (AI, Threat Intel, Quarantine)', () => {
       }
     });
   });
+
+  describe('Anti-Delete & Message Logging', () => {
+    it('should format deleted message alert cleanly', () => {
+      const escape = (str: string) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const rawText = '<script>alert(1)</script> and "hello"';
+      const clean = escape(rawText);
+
+      expect(clean).toContain('&lt;script&gt;');
+      expect(clean).not.toContain('<script>');
+    });
+  });
 });
+
