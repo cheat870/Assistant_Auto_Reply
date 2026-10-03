@@ -2,6 +2,7 @@ import http from 'node:http';
 import { webhookCallback, type Bot } from 'grammy';
 import { getEnv } from '../config/env.js';
 import { prisma } from '../database/prisma.js';
+import { aiService } from '../services/ai.service.js';
 import { rateLimitService } from '../services/rateLimit.service.js';
 import type { BotContext } from '../types/index.js';
 import { logger } from '../utils/logger.js';
@@ -54,6 +55,38 @@ export function createHttpServer(bot: Bot<BotContext>): http.Server {
           database: dbOk ? 'ok' : 'error',
           redis: redisOk ? 'ok' : 'degraded (in-memory fallback active)',
           bot: 'ok',
+        })
+      );
+      return;
+    }
+
+    // GET /diag - Diagnostic endpoint for AI and threat intelligence
+    if (req.method === 'GET' && url.pathname === '/diag') {
+      const prompt = url.searchParams.get('q') || '1+2=';
+      const keyPresent = Boolean(env.GEMINI_API_KEY);
+      const keyLength = env.GEMINI_API_KEY ? env.GEMINI_API_KEY.length : 0;
+      const keyPrefix = env.GEMINI_API_KEY ? env.GEMINI_API_KEY.substring(0, 8) + '...' : 'none';
+      const vtPresent = Boolean(env.VIRUSTOTAL_API_KEY);
+
+      let aiResult: any = null;
+      let aiError: string | null = null;
+      try {
+        aiResult = await aiService.generateSmartAutoReply(prompt, 'Tester');
+      } catch (err: any) {
+        aiError = err?.message || String(err);
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          geminiConfigured: keyPresent,
+          geminiKeyLength: keyLength,
+          geminiKeyPrefix: keyPrefix,
+          geminiModel: env.GEMINI_MODEL,
+          virusTotalConfigured: vtPresent,
+          testPrompt: prompt,
+          aiResponse: aiResult,
+          aiError,
         })
       );
       return;

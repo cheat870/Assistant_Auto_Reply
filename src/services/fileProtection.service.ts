@@ -74,13 +74,64 @@ export class FileProtectionService {
 
     auditLogger.fileDetected(sanitizedName, path.extname(sanitizedName), 'PENDING_ANALYSIS');
 
-    // Check file size limit
-    const maxBytes = env.MAX_FILE_SIZE_MB * 1024 * 1024;
-    if (sizeBytes > maxBytes) {
-      await ctx.reply(
-        `⚠️ <b>File Security Notice</b>\n\nThe file <code>${sanitizedName}</code> (${(sizeBytes / (1024 * 1024)).toFixed(1)} MB) exceeds the maximum analysis size limit of ${env.MAX_FILE_SIZE_MB} MB.\n\nStatus: Manual review required.`,
-        { reply_to_message_id: messageId, parse_mode: 'HTML' }
+    // Telegram Bot API enforces a strict 20 MB download limit
+    const telegramMaxDownloadBytes = 20 * 1024 * 1024;
+    if (sizeBytes > telegramMaxDownloadBytes) {
+      const extDetails = analyzeFilenameExtension(sanitizedName);
+      const isDangerous =
+        extDetails.isDoubleExtension ||
+        (await blockedExtensionRepository.isExtensionBlocked(extDetails.primaryExtension));
+
+      const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(1);
+
+      let warningMsg = `⚠️ <b>ការជូនដំណឹងសុវត្ថិភាពឯកសារ (File Security Notice)</b>\n\n`;
+      warningMsg += `📁 <b>ឈ្មោះឯកសារ:</b> <code>${sanitizedName}</code>\n`;
+      warningMsg += `📦 <b>ទំហំ:</b> ${sizeMB} MB (លើសពី 20 MB ដែល Telegram Bot API អនុញ្ញាតឱ្យទាញយកស្កេន)\n\n`;
+
+      if (isDangerous) {
+        warningMsg += `🚨 <b>កម្រិតគ្រោះថ្នាក់:</b> 🔴 <b>CRITICAL (គ្រោះថ្នាក់ខ្ពស់)</b>\n`;
+        warningMsg += `⚠️ <b>ការវិភាគបឋម:</b> ឯកសារនេះជាប្រភេទកម្មវិធីដំណើរការ <code>${extDetails.primaryExtension}</code> `;
+        if (extDetails.isDoubleExtension) {
+          warningMsg += `និងជាប្រភេទ <b>Double Extension (${extDetails.secondaryExtension || ''}${extDetails.primaryExtension})</b> ក្លែងបន្លំជាឯកសារការងារ! `;
+        }
+        warningMsg += `\n\n❌ <b>សូមកុំចុចបើក (Don't Open/Run) ឯកសារនេះជាដាច់ខាត ព្រោះអាចជាមេរោគលួចទិន្នន័យ (Malware/Stealer)!</b>`;
+      } else {
+        warningMsg += `ℹ️ ឯកសារនេះមានទំហំធំលើសពី 20MB មិនអាចស្កេនដោយស្វ័យប្រវត្តិបានទេ។ សូមប្រុងប្រយ័ត្នមុនពេលបើក។`;
+      }
+
+      await ctx.reply(warningMsg, {
+        reply_to_message_id: messageId,
+        parse_mode: 'HTML',
+      });
+
+      // Record event and alert admin
+      const event = await fileEventRepository.createFileEvent({
+        chatId,
+        userId,
+        messageId,
+        filename: sanitizedName,
+        extension: extDetails.primaryExtension,
+        mimeType: mimeType || 'application/octet-stream',
+        size: BigInt(sizeBytes),
+        sha256: 'OVERSIZE_NO_HASH',
+        fileType: isDangerous ? 'Oversized Suspicious Executable' : 'Oversized File',
+        riskLevel: isDangerous ? 'CRITICAL' : 'UNKNOWN',
+        scannerStatus: 'NOT_SCANNED',
+        indicators: ['FILE_SIZE_OVER_20MB', ...(extDetails.isDoubleExtension ? ['DOUBLE_EXTENSION'] : [])],
+        impactSummary: [isDangerous ? 'Suspicious oversized executable file' : 'File exceeds 20MB limit'],
+      });
+
+      await notificationService.notifyAdmins(
+        ctx.api,
+        event.id,
+        `🚨 <b>[ឯកសារធំគួរឱ្យសង្ស័យ - OVERSIZED FILE DETECTED]</b>\n\n` +
+        `📁 <b>ឯកសារ:</b> <code>${sanitizedName}</code> (${sizeMB} MB)\n` +
+        `⚠️ <b>កម្រិតហានិភ័យ:</b> ${isDangerous ? '🔴 CRITICAL' : '⚪ UNKNOWN'}\n` +
+        `👤 <b>អ្នកផ្ញើ:</b> <code>${userId}</code> | Chat: <code>${chatId}</code>\n\n` +
+        (isDangerous ? `❌ <b>សង្ស័យជាមេរោគ (${extDetails.primaryExtension})!</b> Telegram Bot API មិនអាចទាញយកលើសពី 20MB បានទេ។` : ''),
+        getChatLanguage(ctx.chat?.id, ctx.from?.language_code)
       );
+
       return;
     }
 
