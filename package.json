@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "prisma generate && node scripts/db-sync.js && tsc",
+    "build": "prisma generate && node scripts/db-sync.js && tsc && node scripts/copy-assets.js",
     "start": "node dist/index.js",
     "lint": "eslint .",
     "format": "prettier --write .",

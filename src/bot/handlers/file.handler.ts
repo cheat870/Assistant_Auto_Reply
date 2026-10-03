@@ -5,7 +5,7 @@ import type { BotContext } from '../../types/index.js';
 import { auditLogger, logger } from '../../utils/logger.js';
 
 export async function handleDocumentMessage(ctx: BotContext): Promise<void> {
-  const doc = ctx.message?.document;
+  const doc = ctx.message?.document || ctx.businessMessage?.document;
   if (!doc) return;
 
   const filename = doc.file_name || 'unnamed_file';
@@ -30,8 +30,9 @@ export async function handleDocumentMessage(ctx: BotContext): Promise<void> {
 }
 
 export async function handleAudioOrVideoMessage(ctx: BotContext): Promise<void> {
-  const isVoice = Boolean(ctx.message?.voice);
-  const media = ctx.message?.video || ctx.message?.audio || ctx.message?.voice;
+  const msg = ctx.message || ctx.businessMessage;
+  const isVoice = Boolean(msg?.voice);
+  const media = msg?.video || msg?.audio || msg?.voice;
   if (!media) return;
 
   // AI Voice-to-Text Transcription for voice notes
@@ -51,8 +52,10 @@ export async function handleAudioOrVideoMessage(ctx: BotContext): Promise<void> 
               `<i>"${transcription.transcript}"</i>\n\n` +
               `💡 <b>សេចក្តីសង្ខេប៖</b> ${transcription.summaryKhmer}`;
 
+            const businessConnId = ctx.businessMessage?.business_connection_id;
             await ctx.reply(replyMsg, {
-              reply_to_message_id: ctx.message?.message_id,
+              ...(businessConnId ? { business_connection_id: businessConnId } : {}),
+              reply_to_message_id: msg?.message_id,
               parse_mode: 'HTML',
             });
             return;
@@ -91,8 +94,11 @@ export async function handleAudioOrVideoMessage(ctx: BotContext): Promise<void> 
   }
 }
 
+import { channelArchiveService } from '../../services/channelArchive.service.js';
+
 export async function handlePhotoMessage(ctx: BotContext): Promise<void> {
-  const photos = ctx.message?.photo;
+  const incoming = ctx.message || ctx.businessMessage;
+  const photos = incoming?.photo;
   if (!photos || photos.length === 0) return;
 
   if (!aiService.isAvailable()) return;
@@ -109,6 +115,8 @@ export async function handlePhotoMessage(ctx: BotContext): Promise<void> {
     if (!res.ok) return;
 
     const buffer = Buffer.from(await res.arrayBuffer());
+
+    // 1. Check for Bank Slip / Payment Receipt
     const slip = await aiService.analyzeBankSlip(buffer, 'image/jpeg');
 
     if (slip && slip.isBankSlip && slip.status === 'VERIFIED') {
@@ -123,9 +131,73 @@ export async function handlePhotoMessage(ctx: BotContext): Promise<void> {
         `\n✅ <b>ស្ថានភាព៖</b> វិក្កយបត្រត្រឹមត្រូវ (បានកត់ត្រាទុកជូន SOCHEAT រួចរាល់)`;
 
       await ctx.reply(msg, {
-        reply_to_message_id: ctx.message?.message_id,
+        reply_to_message_id: incoming?.message_id,
         parse_mode: 'HTML',
       });
+
+      // Archive bank slip to Private Channel
+      if (ctx.chat) {
+        await channelArchiveService.archiveBankSlip(
+          ctx.api,
+          slip,
+          photo.file_id,
+          incoming?.from?.first_name || 'ភ្ញៀវ',
+          String(ctx.chat.id)
+        );
+      }
+      return;
+    }
+
+    // 2. Check for QR Code (Phishing, Telegram Login Hijacking, or Bakong Payment)
+    const qr = await aiService.analyzeQrCode(buffer, 'image/jpeg');
+    if (qr && qr.isQrCode) {
+      const escape = (s?: string) => (s ? s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'N/A');
+
+      if (qr.qrType === 'TELEGRAM_LOGIN' || qr.isPhishingOrSuspicious) {
+        const warning = [
+          `🚨 <b>ការព្រមានសុវត្ថិភាព QR CODE (DANGEROUS QR PHISHING ALERT)</b>`,
+          ``,
+          `⚠️ <b>ប្រភេទ QR៖</b> <code>${qr.qrType}</code>`,
+          `🔴 <b>កម្រិតគ្រោះថ្នាក់៖</b> <b>CRITICAL (គ្រោះថ្នាក់ខ្ពស់បំផុត)</b>`,
+          qr.qrType === 'TELEGRAM_LOGIN'
+            ? `❌ <b>ការព្រមានជាបន្ទាន់៖ នេះជា Telegram Login QR Code! ប្រសិនបើអ្នកស្កេន ជនខិលខូចនឹងអាចលួចគ្រប់គ្រងគណនី Telegram របស់អ្នកភ្លាមៗ (Account Takeover)!</b>\n`
+            : '',
+          `🔍 <b>ខ្លឹមសារកូដ៖</b> <code>${escape(qr.decodedContent)}</code>`,
+          `💡 <b>ការវិភាគ៖</b> ${qr.summaryKhmer}`,
+          ``,
+          `❌ <b>សូមកុំស្កេន QR Code នេះជាដាច់ខាត!</b>`,
+        ].filter(Boolean).join('\n');
+
+        await ctx.reply(warning, {
+          reply_to_message_id: incoming?.message_id,
+          parse_mode: 'HTML',
+        });
+
+        if (ctx.chat) {
+          await channelArchiveService.archiveSecurityThreat(ctx.api, {
+            type: 'MALICIOUS_QR',
+            title: 'Dangerous QR Code Detected',
+            item: qr.decodedContent || 'Telegram Login QR',
+            riskLevel: 'CRITICAL',
+            detectionReason: qr.threatDetails || qr.summaryKhmer,
+            senderId: String(incoming?.from?.id || 'unknown'),
+            chatId: String(ctx.chat.id),
+          });
+        }
+        return;
+      }
+
+      if (qr.qrType === 'PAYMENT_KHQR') {
+        await ctx.reply(
+          `💳 <b>បានស្គាល់ QR កូដទូទាត់ប្រាក់ (Payment KHQR)</b>\n\n` +
+          `• <b>ទិន្នន័យ៖</b> <code>${escape(qr.decodedContent)}</code>\n` +
+          `• <b>ស្ថានភាព៖</b> មានសុវត្ថិភាព (Safe Payment Code)`,
+          {
+            reply_to_message_id: incoming?.message_id,
+            parse_mode: 'HTML',
+          }
+        );
+      }
     }
   } catch (err) {
     logger.error({ err }, 'Error in handlePhotoMessage');

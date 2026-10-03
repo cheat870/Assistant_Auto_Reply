@@ -101,6 +101,12 @@ const envSchema = z.object({
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
   S3_REGION: z.string().default('auto'),
+
+  // Private Channel Auto-Archive Configuration
+  ARCHIVE_CHANNEL_ID: z.string().optional(),
+
+  // Web Admin Dashboard Security
+  DASHBOARD_SECRET: z.string().default('socheat2026'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -6,12 +6,18 @@ import { rateLimitService } from '../services/rateLimit.service.js';
 import type { BotContext } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 
+import { handleDashboardRoute } from './dashboard.router.js';
+
 export function createHttpServer(bot: Bot<BotContext>): http.Server {
   const env = getEnv();
   const webhookHandler = env.BOT_MODE === 'webhook' ? webhookCallback(bot, 'http') : null;
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+
+    // Handle Web Admin Dashboard and Dashboard API
+    const handledDashboard = await handleDashboardRoute(req, res, url);
+    if (handledDashboard) return;
 
     // GET /health or HEAD /health (and root /) - Liveness probe
     if ((req.method === 'GET' || req.method === 'HEAD') && (url.pathname === '/health' || url.pathname === '/')) {

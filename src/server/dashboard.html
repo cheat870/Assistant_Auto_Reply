@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOCHEAT Assistant - Security & Auto-Reply Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 24, 38, 0.7);
+      --border: rgba(255, 255, 255, 0.08);
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', 'Kantumruy Pro', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: #fff;
+    }
+    .badge {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    .nav-tabs {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .nav-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .nav-tab.active, .nav-tab:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      width: 100%;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      backdrop-filter: blur(8px);
+    }
+    .stat-title {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .stat-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      backdrop-filter: blur(8px);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    th {
+      padding: 0.75rem 1rem;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .tag {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .tag-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .tag-success { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .tag-warning { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .tag-blue { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+    
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: var(--primary-hover); }
+    .btn-danger { background: var(--danger); }
+    .btn-danger:hover { background: #dc2626; }
+    .form-group {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    input, select {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 0.6rem 0.85rem;
+      border-radius: 8px;
+      font-family: inherit;
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: var(--primary);
+    }
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 13, 22, 0.9);
+      backdrop-filter: blur(16px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .login-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Password Authentication Modal -->
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-box">
+      <div style="font-size: 2.5rem; margin-bottom: 1rem;">🔐</div>
+      <h2 style="margin-bottom: 0.5rem;">SOCHEAT Admin Portal</h2>
+      <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.5rem;">សូមបញ្ចូល Secret Key ដើម្បីចូលដំណើរការ Dashboard</p>
+      <input type="password" id="authKeyInput" placeholder="Enter Secret Key..." style="width: 100%; margin-bottom: 1rem;">
+      <button class="btn" style="width: 100%;" onclick="attemptLogin()">ចូលដំណើរការ (Login)</button>
+      <p id="loginError" style="color: var(--danger); font-size: 0.8rem; margin-top: 0.75rem;" class="hidden">លេខសម្ងាត់មិនត្រឹមត្រូវទេ!</p>
+    </div>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="logo">
+      <span>🛡️ SOCHEAT Assistant</span>
+      <span class="badge">Live 24/7</span>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('overview')">📊 ស្ថិតិទូទៅ</button>
+      <button class="nav-tab" onclick="switchTab('deleted')">🗑️ សារដែលគេលុប</button>
+      <button class="nav-tab" onclick="switchTab('threats')">🚨 របាយការណ៍សន្តិសុខ</button>
+      <button class="nav-tab" onclick="switchTab('keywords')">⚙️ ការឆ្លើយតប</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- Quick Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-title">👤 អ្នកប្រើប្រាស់សរុប</div>
+        <div class="stat-value" id="statUsers">...</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">💬 សារដែលបានទទួល</div>
+        <div class="stat-value" id="statMessages">...</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">🤖 ឆ្លើយតបស្វ័យប្រវត្តិ (AI)</div>
+        <div class="stat-value" id="statReplies">...</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">🗑️ សារដែលគេលុប (រក្សាទុក)</div>
+        <div class="stat-value" id="statDeleted">...</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">🛡️ ឯកសារ & Link វិភាគ</div>
+        <div class="stat-value" id="statFiles">...</div>
+      </div>
+    </div>
+
+    <!-- Tab 1: Overview -->
+    <div id="tab-overview">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">⚡ ស្ថានភាពប្រព័ន្ធ & ការកំណត់រហ័ស</h3>
+        </div>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <button class="btn" onclick="toggleBusyMode()" id="btnBusyMode">🔄 ប្តូរស្ថានភាព Busy Mode</button>
+          <button class="btn" style="background: rgba(255,255,255,0.1);" onclick="loadAllData()">🔄 Refresh ទិន្នន័យ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Deleted Messages -->
+    <div id="tab-deleted" class="hidden">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🗑️ បណ្ណសារសារដែលគេបានលុប (Deleted Messages Timeline)</h3>
+        </div>
+        <table id="deletedTable">
+          <thead>
+            <tr>
+              <th>ពេលវេលា</th>
+              <th>អ្នកផ្ញើ</th>
+              <th>ប្រភេទ</th>
+              <th>ខ្លឹមសារសារដែលគេបានលុប</th>
+            </tr>
+          </thead>
+          <tbody id="deletedBody">
+            <tr><td colspan="4" style="text-align: center;">កំពុងទាញយក...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 3: Threats -->
+    <div id="tab-threats" class="hidden">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🚨 របាយការណ៍ស្កេនមេរោគ និង Phishing Links</h3>
+        </div>
+        <table id="threatsTable">
+          <thead>
+            <tr>
+              <th>កាលបរិច្ឆេទ</th>
+              <th>មុខសញ្ញា (Filename/URL)</th>
+              <th>កម្រិតហានិភ័យ</th>
+              <th>ស្ថានភាព & VirusTotal</th>
+            </tr>
+          </thead>
+          <tbody id="threatsBody">
+            <tr><td colspan="4" style="text-align: center;">កំពុងទាញយក...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 4: Keywords & Settings -->
+    <div id="tab-keywords" class="hidden">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">➕ បន្ថែមពាក្យគន្លឹះ និងការឆ្លើយតប (Add Auto Reply)</h3>
+        </div>
+        <div class="form-group">
+          <input type="text" id="kwInput" placeholder="ពាក្យគន្លឹះ (Keyword)..." style="flex: 1;">
+          <input type="text" id="replyInput" placeholder="សារឆ្លើយតប (Reply Message)..." style="flex: 2;">
+          <select id="matchTypeSelect">
+            <option value="CONTAINS">មានពាក្យ (Contains)</option>
+            <option value="EXACT">ដូចទាំងស្រុង (Exact)</option>
+            <option value="STARTS_WITH">ផ្តើមដោយ (Starts With)</option>
+          </select>
+          <button class="btn" onclick="addKeyword()">➕ បន្ថែម (Save)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">📋 បញ្ជីពាក្យគន្លឹះដែលកំពុងដំណើរការ</h3>
+        </div>
+        <table id="keywordsTable">
+          <thead>
+            <tr>
+              <th>Keyword</th>
+              <th>សារឆ្លើយតប</th>
+              <th>ប្រភេទ</th>
+              <th>សកម្មភាព</th>
+            </tr>
+          </thead>
+          <tbody id="keywordsBody">
+            <tr><td colspan="4" style="text-align: center;">កំពុងទាញយក...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let authToken = localStorage.getItem('socheat_dashboard_token') || '';
+
+    function checkAuth() {
+      if (authToken) {
+        document.getElementById('loginOverlay').classList.add('hidden');
+        loadAllData();
+      } else {
+        document.getElementById('loginOverlay').classList.remove('hidden');
+      }
+    }
+
+    function attemptLogin() {
+      const input = document.getElementById('authKeyInput').value.trim();
+      if (!input) return;
+      authToken = input;
+      localStorage.setItem('socheat_dashboard_token', input);
+      fetch('/api/dashboard/stats', { headers: { 'x-dashboard-key': authToken } })
+        .then(res => {
+          if (!res.ok) throw new Error();
+          document.getElementById('loginOverlay').classList.add('hidden');
+          loadAllData();
+        })
+        .catch(() => {
+          document.getElementById('loginError').classList.remove('hidden');
+          localStorage.removeItem('socheat_dashboard_token');
+          authToken = '';
+        });
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      ['overview', 'deleted', 'threats', 'keywords'].forEach(t => {
+        document.getElementById('tab-' + t).classList.add('hidden');
+      });
+      event.target.classList.add('active');
+      document.getElementById('tab-' + tab).classList.remove('hidden');
+    }
+
+    async function loadAllData() {
+      const headers = { 'x-dashboard-key': authToken };
+      
+      // Stats
+      try {
+        const stats = await fetch('/api/dashboard/stats', { headers }).then(r => r.json());
+        document.getElementById('statUsers').innerText = stats.usersCount?.toLocaleString() || '0';
+        document.getElementById('statMessages').innerText = stats.messagesCount?.toLocaleString() || '0';
+        document.getElementById('statReplies').innerText = stats.autoRepliesCount?.toLocaleString() || '0';
+        document.getElementById('statDeleted').innerText = stats.deletedMessagesCount?.toLocaleString() || '0';
+        document.getElementById('statFiles').innerText = stats.filesAnalyzedCount?.toLocaleString() || '0';
+      } catch (e) {}
+
+      // Deleted Messages
+      try {
+        const deleted = await fetch('/api/dashboard/deleted-messages', { headers }).then(r => r.json());
+        const tbody = document.getElementById('deletedBody');
+        if (deleted.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">គ្មានសារដែលបានលុបឡើយ។</td></tr>';
+        } else {
+          tbody.innerHTML = deleted.map(d => `
+            <tr>
+              <td style="color: var(--text-muted); font-size: 0.8rem;">${new Date(d.deletedAt || d.createdAt).toLocaleString()}</td>
+              <td><b>${escapeHtml(d.senderName || 'Anonymous')}</b></td>
+              <td><span class="tag tag-blue">${d.messageType.toUpperCase()}</span></td>
+              <td style="max-width: 450px; word-break: break-word;">${escapeHtml(d.fullText || '[Media File]')}</td>
+            </tr>
+          `).join('');
+        }
+      } catch (e) {}
+
+      // Threats
+      try {
+        const threats = await fetch('/api/dashboard/security-events', { headers }).then(r => r.json());
+        const tbody = document.getElementById('threatsBody');
+        if (threats.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">គ្មានឯកសារមេរោគត្រូវបានរកឃើញឡើយ។</td></tr>';
+        } else {
+          tbody.innerHTML = threats.map(t => `
+            <tr>
+              <td style="color: var(--text-muted); font-size: 0.8rem;">${new Date(t.createdAt).toLocaleString()}</td>
+              <td><code>${escapeHtml(t.filename)}</code></td>
+              <td><span class="tag tag-danger">${t.riskLevel}</span></td>
+              <td>${t.status} (VT: ${t.scannerStatus || 'N/A'})</td>
+            </tr>
+          `).join('');
+        }
+      } catch (e) {}
+
+      // Keywords
+      try {
+        const kws = await fetch('/api/dashboard/keywords', { headers }).then(r => r.json());
+        const tbody = document.getElementById('keywordsBody');
+        if (kws.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">មិនទាន់មាន Keywords ឡើយ។</td></tr>';
+        } else {
+          tbody.innerHTML = kws.map(k => `
+            <tr>
+              <td><b>${escapeHtml(k.keyword)}</b></td>
+              <td>${escapeHtml(k.reply)}</td>
+              <td><span class="tag tag-blue">${k.matchType}</span></td>
+              <td><button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="deleteKeyword('${k.id}')">🗑️ លុប</button></td>
+            </tr>
+          `).join('');
+        }
+      } catch (e) {}
+    }
+
+    async function addKeyword() {
+      const kw = document.getElementById('kwInput').value.trim();
+      const reply = document.getElementById('replyInput').value.trim();
+      const matchType = document.getElementById('matchTypeSelect').value;
+      if (!kw || !reply) return;
+
+      await fetch('/api/dashboard/keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-dashboard-key': authToken },
+        body: JSON.stringify({ keyword: kw, reply, matchType }),
+      });
+
+      document.getElementById('kwInput').value = '';
+      document.getElementById('replyInput').value = '';
+      loadAllData();
+    }
+
+    async function deleteKeyword(id) {
+      if (!confirm('តើអ្នកប្រាកដជាចង់លុប Keyword នេះមែនទេ?')) return;
+      await fetch('/api/dashboard/keywords/' + id, {
+        method: 'DELETE',
+        headers: { 'x-dashboard-key': authToken },
+      });
+      loadAllData();
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    window.onload = checkAuth;
+  </script>
+</body>
+</html>

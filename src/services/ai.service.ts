@@ -21,6 +21,15 @@ export interface VoiceTranscription {
   summaryKhmer: string;
 }
 
+export interface QrCodeAnalysis {
+  isQrCode: boolean;
+  qrType: 'TELEGRAM_LOGIN' | 'PAYMENT_KHQR' | 'URL' | 'TEXT' | 'UNKNOWN' | 'NOT_A_QR';
+  decodedContent?: string;
+  isPhishingOrSuspicious: boolean;
+  threatDetails?: string;
+  summaryKhmer: string;
+}
+
 export class AiService {
   private client: GoogleGenAI | null = null;
 
@@ -251,6 +260,63 @@ If this image is not a payment receipt/bank slip, set "isBankSlip": false and "s
       return parsed;
     } catch (err) {
       logger.error({ err }, 'Gemini AI Bank Slip Analysis failed');
+      return null;
+    }
+  }
+
+  /**
+   * Decodes and inspects a QR code image to detect phishing, Telegram session hijacking, or payment codes.
+   */
+  async analyzeQrCode(
+    imageBuffer: Buffer,
+    mimeType: string = 'image/jpeg'
+  ): Promise<QrCodeAnalysis | null> {
+    try {
+      const prompt = `
+Carefully examine this image to determine if it contains a QR code.
+If a QR code is detected:
+1. Decode the content inside the QR code (extract the URL, login token, text, or payment string).
+2. Classify its type:
+   - "TELEGRAM_LOGIN": If it looks like a Telegram login QR code (tg://login?token=..., web.telegram.org login, or QR login for Telegram desktop/web). CRITICAL: Unknown Telegram login QRs are used by hackers to hijack personal accounts!
+   - "PAYMENT_KHQR": If it is a Cambodian Bakong KHQR, ABA KHQR, or bank payment code.
+   - "URL": Any other general website URL.
+   - "TEXT": Plain text or data.
+   - "UNKNOWN": Other unidentifiable format.
+3. Assess if it is a phishing link, malicious URL, or account takeover threat.
+4. Output strictly in JSON format:
+{
+  "isQrCode": true,
+  "qrType": "TELEGRAM_LOGIN" | "PAYMENT_KHQR" | "URL" | "TEXT" | "UNKNOWN",
+  "decodedContent": "Extracted URL or raw string",
+  "isPhishingOrSuspicious": true/false,
+  "threatDetails": "Detailed reason why it is safe or dangerous",
+  "summaryKhmer": "ការពន្យល់ជាភាសាខ្មែរសុទ្ធសាធ (ហាមប្រើភាសាផ្សេង)"
+}
+If NO QR code is found in the image, output:
+{
+  "isQrCode": false,
+  "qrType": "NOT_A_QR",
+  "isPhishingOrSuspicious": false,
+  "summaryKhmer": "មិនមែនជារូបភាព QR Code ឡើយ។"
+}`;
+
+      const response = await this.generateWithFallback([
+        {
+          inlineData: {
+            data: imageBuffer.toString('base64'),
+            mimeType,
+          },
+        },
+        { text: prompt },
+      ]);
+
+      const raw = response?.text || '';
+      if (!raw) return null;
+      const cleanJson = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed: QrCodeAnalysis = JSON.parse(cleanJson);
+      return parsed;
+    } catch (err) {
+      logger.error({ err }, 'Gemini AI QR Code Analysis failed');
       return null;
     }
   }

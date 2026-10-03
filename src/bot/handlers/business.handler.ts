@@ -1,6 +1,8 @@
 import { getEnv } from '../../config/env.js';
 import { aiService } from '../../services/ai.service.js';
 import { autoReplyService } from '../../services/autoReply.service.js';
+import { channelArchiveService } from '../../services/channelArchive.service.js';
+import { linkScannerService } from '../../services/linkScanner.service.js';
 import type { BotContext } from '../../types/index.js';
 import { auditLogger, logger } from '../../utils/logger.js';
 
@@ -39,6 +41,61 @@ export async function handleBusinessTextMessage(ctx: BotContext): Promise<void> 
   if (text.startsWith('/')) return;
 
   const env = getEnv();
+
+  // 0. Phishing & Malicious Link Detection in Business Chat
+  const linkThreats = await linkScannerService.scanMessageText(text);
+  if (linkThreats.length > 0) {
+    const t = linkThreats[0]!;
+    const sender = msg.from?.first_name || 'ភ្ញៀវ';
+    const senderHandle = msg.from?.username ? `@${msg.from.username}` : `ID: ${msg.from?.id || 'unknown'}`;
+
+    logger.warn({ url: t.url, risk: t.riskLevel, from: msg.from?.id }, 'Phishing link detected in business chat');
+
+    // Alert Admin (SOCHEAT) directly in Telegram PM so they do not open it!
+    for (const adminId of env.ADMIN_IDS) {
+      try {
+        await ctx.api.sendMessage(
+          adminId.toString(),
+          `🚨 <b>ការព្រមាន PHISHING LINK ក្នុង BUSINESS CHAT!</b>\n\n` +
+          `👤 <b>ភ្ញៀវផ្ញើ៖</b> ${sender} (${senderHandle})\n` +
+          `🔗 <b>តំណភ្ជាប់គ្រោះថ្នាក់៖</b> <code>${t.url}</code>\n` +
+          `🔴 <b>កម្រិតហានិភ័យ៖</b> <b>${t.riskLevel}</b>\n` +
+          `🔍 <b>មូលហេតុ៖</b> ${t.detectionReason}\n\n` +
+          `❌ <i>សូមកុំចុចបើកតំណភ្ជាប់នេះក្នុង Telegram របស់អ្នកឱ្យសោះ!</i>`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (adminErr) {
+        logger.warn({ adminErr }, 'Failed to alert admin about business phishing link');
+      }
+    }
+
+    // Archive to private channel
+    await channelArchiveService.archiveSecurityThreat(ctx.api, {
+      type: 'PHISHING_LINK',
+      title: 'Business Chat Phishing Link',
+      item: t.url,
+      riskLevel: t.riskLevel,
+      detectionReason: t.detectionReason || 'Phishing scam link sent via business chat',
+      senderId: String(msg.from?.id || 'unknown'),
+      chatId: String(msg.chat.id),
+    });
+
+    // Send safety reply to sender if replying is enabled
+    try {
+      await ctx.reply(
+        `⚠️ <b>ប្រព័ន្ធសុវត្ថិភាពបានរកឃើញថា តំណភ្ជាប់ (Link) ដែលអ្នកបានផ្ញើមកអាចមានហានិភ័យ Phishing / Scam។</b>\nសូមកុំផ្ញើតំណភ្ជាប់មិនច្បាស់លាស់។`,
+        {
+          business_connection_id: msg.business_connection_id,
+          reply_to_message_id: msg.message_id,
+          parse_mode: 'HTML',
+        }
+      );
+    } catch {
+      // ignore reply error
+    }
+    return;
+  }
+
   if (!env.AUTO_REPLY_ENABLED) return;
 
   // Do not reply to bots

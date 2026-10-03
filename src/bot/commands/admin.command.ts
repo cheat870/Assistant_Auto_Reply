@@ -1,8 +1,10 @@
 import { InlineKeyboard } from 'grammy';
 import { getEnv } from '../../config/env.js';
+import { botSettingRepository } from '../../database/repositories/botSetting.repository.js';
 import { getChatLanguage, t } from '../../i18n/index.js';
 import { adminService } from '../../services/admin.service.js';
 import { autoReplyService } from '../../services/autoReply.service.js';
+import { channelArchiveService } from '../../services/channelArchive.service.js';
 import type { BotContext } from '../../types/index.js';
 import { getAdminPanelKeyboard } from '../keyboards/admin.keyboard.js';
 
@@ -220,3 +222,49 @@ export async function handleBusyCommand(ctx: BotContext): Promise<void> {
       : `✅ <b>Busy reply message updated and enabled!</b>\n\nNew message:\n<code>${arg}</code>`;
   await ctx.reply(msg, { parse_mode: 'HTML' });
 }
+
+/**
+ * Command /archive [<channel_id>]
+ * Checks or configures the Telegram Private Archive Channel ID.
+ */
+export async function handleArchiveCommand(ctx: BotContext): Promise<void> {
+  const rawText = ctx.message?.text?.trim() || '';
+  const parts = rawText.split(/\s+/);
+  const arg = parts.slice(1).join(' ').trim();
+
+  const currentId = await channelArchiveService.getChannelId();
+
+  if (!arg) {
+    const statusMsg = currentId
+      ? `📁 <b>ប៉ុស្តិ៍បណ្ណសារស្វ័យប្រវត្តិ (Private Archive Channel)៖</b>\n\n` +
+        `• <b>Channel ID បច្ចុប្បន្ន៖</b> <code>${currentId}</code>\n` +
+        `• <b>ស្ថានភាព៖</b> ✅ សកម្ម (Active)\n\n` +
+        `💡 <b>មុខងារស្វ័យប្រវត្តិ៖</b>\n` +
+        `- រក្សាទុកវិក្កយបត្រ / Bank Slip KHQR\n` +
+        `- រក្សាទុកសារ និងរូបភាពដែលគេបានលុប (Deleted Messages)\n` +
+        `- រក្សាទុករបាយការណ៍មេរោគ និង Phishing Links\n\n` +
+        `📖 <b>របៀបប្តូរ Channel ID ថ្មី៖</b>\n` +
+        `វាយ៖ <code>/archive -100xxxxxxxxxx</code>\n` +
+        `<i>(ចំណាំ៖ ត្រូវប្រាកដថាបានទាញ Bot ចូល Channel នោះ និងផ្តល់សិទ្ធិ Post Messages)</i>`
+      : `📁 <b>ប៉ុស្តិ៍បណ្ណសារស្វ័យប្រវត្តិ (Private Archive Channel)៖</b>\n\n` +
+        `• <b>ស្ថានភាព៖</b> ❌ មិនទាន់កំណត់ (Not Configured)\n\n` +
+        `📖 <b>របៀបកំណត់៖</b>\n` +
+        `1. បង្កើត Telegram Private Channel ថ្មីមួយ\n` +
+        `2. Add Bot របស់អ្នកចូលជា Administrator (ផ្តល់សិទ្ធិ Post Messages)\n` +
+        `3. វាយបញ្ជា៖ <code>/archive &lt;CHANNEL_ID&gt;</code> (ឧទាហរណ៍៖ <code>/archive -1001234567890</code>)`;
+
+    await ctx.reply(statusMsg, { parse_mode: 'HTML' });
+    return;
+  }
+
+  // Update archive channel ID in bot setting repository
+  await botSettingRepository.setSetting('ARCHIVE_CHANNEL_ID', arg, 'Private Archive Channel Telegram ID');
+
+  await ctx.reply(
+    `✅ <b>បានកំណត់ Archive Channel ID ជោគជ័យ!</b>\n\n` +
+    `• <b>Channel ID ថ្មី៖</b> <code>${arg}</code>\n\n` +
+    `រាល់ Bank Slips, Deleted Messages, និង Phishing Threats នឹងត្រូវបាញ់ចូល Channel នេះដោយស្វ័យប្រវត្តិ។`,
+    { parse_mode: 'HTML' }
+  );
+}
+

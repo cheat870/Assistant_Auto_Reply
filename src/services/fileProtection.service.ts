@@ -8,6 +8,7 @@ import { analyzeFilenameExtension } from '../utils/extension.js';
 import { generateSafeTempFilename, sanitizeFilename } from '../utils/filename.js';
 import { auditLogger, logger } from '../utils/logger.js';
 import { cleanupTempDir, createIsolatedTempDir, withTimeout } from '../utils/security.js';
+import { channelArchiveService } from './channelArchive.service.js';
 import { FileAnalysisService } from './fileAnalysis.service.js';
 import { notificationService } from './notification.service.js';
 import { quarantineStorageService } from './quarantineStorage.service.js';
@@ -67,7 +68,7 @@ export class FileProtectionService {
     }
 
     const chatId = ctx.chat?.id.toString();
-    const messageId = ctx.message?.message_id;
+    const messageId = ctx.message?.message_id || ctx.businessMessage?.message_id;
     const userId = ctx.from?.id.toString() || 'unknown';
 
     if (!ctx.chat || !chatId || !messageId) return;
@@ -99,7 +100,9 @@ export class FileProtectionService {
         warningMsg += `ℹ️ ឯកសារនេះមានទំហំធំលើសពី 20MB មិនអាចស្កេនដោយស្វ័យប្រវត្តិបានទេ។ សូមប្រុងប្រយ័ត្នមុនពេលបើក។`;
       }
 
+      const businessConnId = (ctx as any).businessMessage?.business_connection_id;
       await ctx.reply(warningMsg, {
+        ...(businessConnId ? { business_connection_id: businessConnId } : {}),
         reply_to_message_id: messageId,
         parse_mode: 'HTML',
       });
@@ -131,6 +134,18 @@ export class FileProtectionService {
         (isDangerous ? `❌ <b>សង្ស័យជាមេរោគ (${extDetails.primaryExtension})!</b> Telegram Bot API មិនអាចទាញយកលើសពី 20MB បានទេ។` : ''),
         getChatLanguage(ctx.chat?.id, ctx.from?.language_code)
       );
+
+      if (isDangerous) {
+        await channelArchiveService.archiveSecurityThreat(ctx.api, {
+          type: 'MALWARE_FILE',
+          title: 'Oversized Suspicious File',
+          item: sanitizedName,
+          riskLevel: 'CRITICAL',
+          detectionReason: `Oversized executable (${extDetails.primaryExtension}) - Double Extension: ${extDetails.isDoubleExtension}`,
+          senderId: userId,
+          chatId,
+        });
+      }
 
       return;
     }
@@ -196,7 +211,9 @@ export class FileProtectionService {
 
       // 5. Send concise user-facing explanation in the chat
       const userMessage = this.analysisService.formatUserAlert(analysisResult, locale);
+      const businessConnId = (ctx as any).businessMessage?.business_connection_id;
       await ctx.reply(userMessage, {
+        ...(businessConnId ? { business_connection_id: businessConnId } : {}),
         reply_to_message_id: messageId,
         parse_mode: 'HTML',
       });
@@ -221,6 +238,18 @@ export class FileProtectionService {
       );
 
       await notificationService.notifyAdmins(ctx.api, fileEvent.id, adminAlertText, 'km');
+
+      if (analysisResult.riskLevel === 'HIGH' || analysisResult.riskLevel === 'CRITICAL') {
+        await channelArchiveService.archiveSecurityThreat(ctx.api, {
+          type: 'MALWARE_FILE',
+          title: 'Suspicious / Malicious File Detected',
+          item: sanitizedName,
+          riskLevel: analysisResult.riskLevel,
+          detectionReason: analysisResult.impactSummary.join('; ') || 'Malicious indicators detected',
+          senderId: userId,
+          chatId,
+        });
+      }
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       auditLogger.error(`Error processing file ${sanitizedName}`, err, { chatId, messageId });

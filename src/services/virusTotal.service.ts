@@ -115,6 +115,97 @@ export class VirusTotalService {
       return null;
     }
   }
+
+  /**
+   * Queries VirusTotal v3 REST API for a URL's safety reputation.
+   */
+  async getUrlReport(targetUrl: string): Promise<{
+    isConfigured: boolean;
+    isFound: boolean;
+    url: string;
+    maliciousCount: number;
+    suspiciousCount: number;
+    harmlessCount: number;
+    totalEngines: number;
+    threatVerdict: 'CLEAN' | 'SUSPICIOUS' | 'MALICIOUS' | 'UNKNOWN';
+    permalink?: string;
+  } | null> {
+    const env = getEnv();
+    if (!env.VIRUSTOTAL_API_KEY) {
+      return {
+        isConfigured: false,
+        isFound: false,
+        url: targetUrl,
+        maliciousCount: 0,
+        suspiciousCount: 0,
+        harmlessCount: 0,
+        totalEngines: 0,
+        threatVerdict: 'UNKNOWN',
+      };
+    }
+
+    try {
+      // VirusTotal v3 URL identifiers are base64url encoded without padding
+      const urlId = Buffer.from(targetUrl).toString('base64url');
+      const apiEndpoint = `https://www.virustotal.com/api/v3/urls/${urlId}`;
+
+      const response = await fetch(apiEndpoint, {
+        method: 'GET',
+        headers: {
+          'x-apikey': env.VIRUSTOTAL_API_KEY,
+          Accept: 'application/json',
+        },
+      });
+
+      if (response.status === 404) {
+        return {
+          isConfigured: true,
+          isFound: false,
+          url: targetUrl,
+          maliciousCount: 0,
+          suspiciousCount: 0,
+          harmlessCount: 0,
+          totalEngines: 0,
+          threatVerdict: 'UNKNOWN',
+        };
+      }
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const json = (await response.json()) as Record<string, any>;
+      const attributes = json.data?.attributes;
+      const stats = attributes?.last_analysis_stats || {};
+
+      const maliciousCount = stats.malicious || 0;
+      const suspiciousCount = stats.suspicious || 0;
+      const harmlessCount = stats.harmless || 0;
+      const totalEngines = maliciousCount + suspiciousCount + harmlessCount + (stats.undetected || 0);
+
+      let threatVerdict: 'CLEAN' | 'SUSPICIOUS' | 'MALICIOUS' | 'UNKNOWN' = 'CLEAN';
+      if (maliciousCount >= 2) {
+        threatVerdict = 'MALICIOUS';
+      } else if (maliciousCount > 0 || suspiciousCount > 0) {
+        threatVerdict = 'SUSPICIOUS';
+      }
+
+      return {
+        isConfigured: true,
+        isFound: true,
+        url: targetUrl,
+        maliciousCount,
+        suspiciousCount,
+        harmlessCount,
+        totalEngines,
+        threatVerdict,
+        permalink: `https://www.virustotal.com/gui/url/${urlId}`,
+      };
+    } catch (err) {
+      logger.warn({ err, targetUrl }, 'VirusTotal URL scan query failed');
+      return null;
+    }
+  }
 }
 
 export const virusTotalService = new VirusTotalService();

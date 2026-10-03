@@ -1,6 +1,8 @@
 import { getEnv } from '../../config/env.js';
 import { aiService } from '../../services/ai.service.js';
 import { autoReplyService } from '../../services/autoReply.service.js';
+import { channelArchiveService } from '../../services/channelArchive.service.js';
+import { linkScannerService } from '../../services/linkScanner.service.js';
 import type { BotContext } from '../../types/index.js';
 import { auditLogger, logger } from '../../utils/logger.js';
 
@@ -10,6 +12,39 @@ export async function handleTextMessage(ctx: BotContext): Promise<void> {
 
   // Ignore bot commands
   if (text.startsWith('/')) return;
+
+  // 0. Phishing & Malicious Link Detection
+  const linkThreats = await linkScannerService.scanMessageText(text);
+  if (linkThreats.length > 0) {
+    const t = linkThreats[0]!;
+    const warning = [
+      `🚨 <b>ការព្រមានសុវត្ថិភាពតំណភ្ជាប់ (PHISHING / MALICIOUS LINK ALERT)</b>`,
+      ``,
+      `⚠️ <b>រកឃើញតំណភ្ជាប់គ្រោះថ្នាក់៖</b> <code>${t.url}</code>`,
+      `🔴 <b>កម្រិតហានិភ័យ៖</b> <b>${t.riskLevel}</b>`,
+      `🔍 <b>មូលហេតុ៖</b> ${t.detectionReason}`,
+      ``,
+      `❌ <b>សូមកុំចុចបើក (Don't Click) ឬបញ្ចូលលេខសម្ងាត់/Login Token របស់អ្នកជាដាច់ខាត!</b>`,
+    ].join('\n');
+
+    await ctx.reply(warning, {
+      reply_to_message_id: ctx.message?.message_id,
+      parse_mode: 'HTML',
+    });
+
+    if (ctx.chat) {
+      await channelArchiveService.archiveSecurityThreat(ctx.api, {
+        type: 'PHISHING_LINK',
+        title: 'Phishing Link Detected',
+        item: t.url,
+        riskLevel: t.riskLevel,
+        detectionReason: t.detectionReason || 'Phishing scam',
+        senderId: String(ctx.from?.id || 'unknown'),
+        chatId: String(ctx.chat.id),
+      });
+    }
+    return;
+  }
 
   const env = getEnv();
   if (!env.AUTO_REPLY_ENABLED) return;

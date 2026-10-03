@@ -11,6 +11,7 @@ import {
 } from './callbacks/moderation.callback.js';
 import {
   handleAdminCommand,
+  handleArchiveCommand,
   handleBusyCommand,
   handleLogsCommand,
   handlePendingCommand,
@@ -102,6 +103,7 @@ export function createBot(): Bot<BotContext> {
   bot.command('logs', requireAdmin, handleLogsCommand);
   bot.command('busy', requireAdmin, handleBusyCommand);
   bot.command(['deleted', 'deleted_messages'], requireAdmin, handleDeletedCommand);
+  bot.command('archive', requireAdmin, handleArchiveCommand);
 
   // Keyword Management Commands
   bot.command('keywords', requireAdmin, handleKeywordsCommand);
@@ -128,6 +130,11 @@ export function createBot(): Bot<BotContext> {
   bot.on('edited_message', handleEditedMessage);
   bot.on('business_message:text', handleBusinessTextMessage);
   bot.on('business_message:photo', handlePhotoMessage);
+  bot.on('business_message:document', handleDocumentMessage);
+  bot.on(
+    ['business_message:video', 'business_message:audio', 'business_message:voice', 'business_message:video_note'],
+    handleAudioOrVideoMessage
+  );
   bot.on('message:photo', handlePhotoMessage);
   bot.on('message:document', handleDocumentMessage);
   bot.on(

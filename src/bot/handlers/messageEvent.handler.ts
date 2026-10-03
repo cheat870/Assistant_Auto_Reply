@@ -1,4 +1,5 @@
 import { messageRepository } from '../../database/repositories/message.repository.js';
+import { channelArchiveService } from '../../services/channelArchive.service.js';
 import { notificationService } from '../../services/notification.service.js';
 import type { BotContext } from '../../types/index.js';
 import { logger } from '../../utils/logger.js';
@@ -21,6 +22,19 @@ export async function handleDeletedBusinessMessages(ctx: BotContext): Promise<vo
       const deletedRecord = await messageRepository.markDeleted(chatId, msgId);
 
       await notificationService.notifyAdminsDeletedMessage(ctx.api, {
+        chatId,
+        messageId: msgId,
+        senderName: deletedRecord.senderName,
+        senderUsername: deletedRecord.senderUsername,
+        senderId: deletedRecord.userId,
+        sentAt: deletedRecord.createdAt,
+        deletedAt: deletedRecord.deletedAt || new Date(),
+        messageType: deletedRecord.messageType,
+        fullText: deletedRecord.fullText,
+        mediaFileId: deletedRecord.mediaFileId,
+      });
+
+      await channelArchiveService.archiveDeletedMessage(ctx.api, {
         chatId,
         messageId: msgId,
         senderName: deletedRecord.senderName,
