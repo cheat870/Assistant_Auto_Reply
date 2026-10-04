@@ -106,7 +106,7 @@ async function main() {
     where: { key: 'BUSY_REPLY_TEXT' },
     create: {
       key: 'BUSY_REPLY_TEXT',
-      value: 'BOT_Reply: សូមរងចាំការឆ្លើយ ពី SOCHEAT ពេលនេះគាត់កំពុងជាប់រវល់។',
+      value: 'សូមរង់ចាំការឆ្លើយតបពី SOCHEAT បន្តិច ពេលនេះគាត់កំពុងជាប់រវល់។',
       description: 'Universal busy reply message',
     },
     update: {},
@@ -116,7 +116,7 @@ async function main() {
     where: { key: 'FALLBACK_REPLY_TEXT' },
     create: {
       key: 'FALLBACK_REPLY_TEXT',
-      value: 'BOT_Reply: សូមរងចាំការឆ្លើយ ពី SOCHEAT ពេលនេះគាត់កំពុងជាប់រវល់។',
+      value: 'សូមរង់ចាំការឆ្លើយតបពី SOCHEAT បន្តិច ពេលនេះគាត់កំពុងជាប់រវល់។',
       description: 'Fallback reply message',
     },
     update: {},

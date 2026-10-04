@@ -19,7 +19,7 @@ async function bootstrap() {
     await blockedExtensionRepository.seedDefaultsIfEmpty();
     const settingsCount = await prisma.botSetting.count();
     if (settingsCount === 0) {
-      const busyMsg = 'BOT_Reply: សូមរងចាំការឆ្លើយ ពី SOCHEAT ពេលនេះគាត់កំពុងជាប់រវល់។';
+      const busyMsg = 'សូមរង់ចាំការឆ្លើយតបពី SOCHEAT បន្តិច ពេលនេះគាត់កំពុងជាប់រវល់។';
       await prisma.botSetting.createMany({
         data: [
           { key: 'BUSY_MODE', value: 'true', description: 'Enable universal busy auto-reply' },

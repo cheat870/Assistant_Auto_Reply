@@ -2,7 +2,7 @@ import type { MatchType } from '@prisma/client';
 import { botSettingRepository } from '../database/repositories/botSetting.repository.js';
 import { keywordRepository } from '../database/repositories/keyword.repository.js';
 
-export const DEFAULT_BUSY_MESSAGE = 'BOT_Reply: សូមរងចាំការឆ្លើយ ពី SOCHEAT ពេលនេះគាត់កំពុងជាប់រវល់។';
+export const DEFAULT_BUSY_MESSAGE = 'សូមរង់ចាំការឆ្លើយតបពី SOCHEAT បន្តិច ពេលនេះគាត់កំពុងជាប់រវល់។';
 
 export interface AutoReplyResult {
   reply: string;

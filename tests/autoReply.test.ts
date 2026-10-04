@@ -113,20 +113,20 @@ describe('AutoReplyService Tests', () => {
     vi.spyOn(botSettingRepository, 'getSetting').mockImplementation(async key => {
       if (key === 'BUSY_MODE') return 'true';
       if (key === 'BUSY_REPLY_TEXT')
-        return 'BOT_Reply: សូមរងចាំការឆ្លើយ ពី SOCHEAT ពេលនេះគាត់កំពុងជាប់រវល់។';
+        return 'សូមរង់ចាំការឆ្លើយតបពី SOCHEAT បន្តិច ពេលនេះគាត់កំពុងជាប់រវល់។';
       return null;
     });
 
     const anyText = await service.findReply('hi bro are you there?');
     expect(anyText).not.toBeNull();
     expect(anyText?.reply).toBe(
-      'BOT_Reply: សូមរងចាំការឆ្លើយ ពី SOCHEAT ពេលនេះគាត់កំពុងជាប់រវល់។'
+      'សូមរង់ចាំការឆ្លើយតបពី SOCHEAT បន្តិច ពេលនេះគាត់កំពុងជាប់រវល់។'
     );
     expect(anyText?.matchType).toBe('BUSY_MODE');
 
     const randomChars = await service.findReply('asdfghjkl12345');
     expect(randomChars?.reply).toBe(
-      'BOT_Reply: សូមរងចាំការឆ្លើយ ពី SOCHEAT ពេលនេះគាត់កំពុងជាប់រវល់។'
+      'សូមរង់ចាំការឆ្លើយតបពី SOCHEAT បន្តិច ពេលនេះគាត់កំពុងជាប់រវល់។'
     );
   });
 

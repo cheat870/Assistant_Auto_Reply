@@ -57,12 +57,14 @@ export class AiService {
     const candidateModels = [
       env.GEMINI_MODEL,
       'gemini-3.8-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-3.8-pro',
       'gemini-2.5-flash',
+      'gemini-3.8-pro',
+      'gemini-2.5-pro',
+      'gemini-3.5-flash-lite',
     ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
     let lastError: any = null;
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
     // 1. Try via official Google GenAI SDK
     for (const model of candidateModels) {
@@ -105,7 +107,7 @@ export class AiService {
             });
           }
 
-          const restRes = await fetch(restUrl, {
+          let restRes = await fetch(restUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -115,6 +117,21 @@ export class AiService {
               contents: [{ parts }],
             }),
           });
+
+          // If Google returns 503 (High Demand spike) or 429, wait 800ms and retry once
+          if (restRes.status === 503 || restRes.status === 429) {
+            await sleep(800);
+            restRes = await fetch(restUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+              },
+              body: JSON.stringify({
+                contents: [{ parts }],
+              }),
+            });
+          }
 
           if (restRes.ok) {
             const data = (await restRes.json()) as any;
