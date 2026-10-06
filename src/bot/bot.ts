@@ -13,6 +13,7 @@ import {
   handleAdminCommand,
   handleArchiveCommand,
   handleBusyCommand,
+  handleDailyReportCommand,
   handleLogsCommand,
   handlePendingCommand,
   handleSettingsCommand,
@@ -106,6 +107,7 @@ export function createBot(): Bot<BotContext> {
   bot.command(['deleted', 'deleted_messages'], requireAdmin, handleDeletedCommand);
   bot.command('archive', requireAdmin, handleArchiveCommand);
   bot.command('users', requireAdmin, handleUsersCommand);
+  bot.command(['report', 'daily'], requireAdmin, handleDailyReportCommand);
 
   // Keyword Management Commands
   bot.command('keywords', requireAdmin, handleKeywordsCommand);

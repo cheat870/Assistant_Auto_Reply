@@ -6,6 +6,7 @@ import { getChatLanguage, t } from '../../i18n/index.js';
 import { adminService } from '../../services/admin.service.js';
 import { autoReplyService } from '../../services/autoReply.service.js';
 import { channelArchiveService } from '../../services/channelArchive.service.js';
+import { dailyReportService } from '../../services/dailyReport.service.js';
 import type { BotContext } from '../../types/index.js';
 import { getAdminPanelKeyboard } from '../keyboards/admin.keyboard.js';
 
@@ -288,7 +289,7 @@ export async function handleUsersCommand(ctx: BotContext): Promise<void> {
 
   const lines = [
     `👥 <b>បញ្ជីឈ្មោះអ្នកប្រើប្រាស់សរុប (${users.length} នាក់)៖</b>`,
-    `<i>អ្នកដែលបានឆាតមកកាន់ Bot ឬ Business Secretary របស់អ្នក៖</i>`,
+    `<i>អ្នកដែលបានឆាតមកកាន់ Bot ឬ Telegram ជំនួយការផ្ទាល់ខ្លួនរបស់អ្នក៖</i>`,
     ``,
   ];
 
@@ -308,5 +309,25 @@ export async function handleUsersCommand(ctx: BotContext): Promise<void> {
   }
 
   await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
+}
+
+/**
+ * Admin command: /report or /daily
+ * Manually requests and sends today's summary digest report to the admin.
+ */
+export async function handleDailyReportCommand(ctx: BotContext): Promise<void> {
+  await ctx.reply('⏳ <i>កំពុងរៀបចំរបាយការណ៍សង្ខេបប្រចាំថ្ងៃ (Daily Digest)...</i>', { parse_mode: 'HTML' });
+
+  try {
+    const stats = await dailyReportService.getDailyStatistics();
+    const message = dailyReportService.formatDailyReportMessage(stats);
+
+    await ctx.reply(message, {
+      parse_mode: 'HTML',
+      link_preview_options: { is_disabled: true },
+    });
+  } catch (err) {
+    await ctx.reply('❌ <b>មិនអាចបង្កើតរបាយការណ៍បានទេនៅពេលនេះ។</b>', { parse_mode: 'HTML' });
+  }
 }
 

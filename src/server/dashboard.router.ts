@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Api } from 'grammy';
 import { getEnv } from '../config/env.js';
 import { prisma } from '../database/prisma.js';
 import { adminService } from '../services/admin.service.js';
@@ -9,6 +10,7 @@ import { keywordRepository } from '../database/repositories/keyword.repository.j
 import { messageRepository } from '../database/repositories/message.repository.js';
 import { botSettingRepository } from '../database/repositories/botSetting.repository.js';
 import { userRepository } from '../database/repositories/user.repository.js';
+import { dailyReportService } from '../services/dailyReport.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,7 +18,8 @@ const __dirname = path.dirname(__filename);
 export async function handleDashboardRoute(
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  url: URL
+  url: URL,
+  botApi?: Api
 ): Promise<boolean> {
   const env = getEnv();
 
@@ -49,9 +52,9 @@ export async function handleDashboardRoute(
     return true;
   }
 
-  // 2. Dashboard API Endpoints (Guarded by x-dashboard-key)
+  // 2. Dashboard API Endpoints (Guarded by x-dashboard-key or key query param)
   if (url.pathname.startsWith('/api/dashboard/')) {
-    const authKey = req.headers['x-dashboard-key'];
+    const authKey = req.headers['x-dashboard-key'] || url.searchParams.get('key');
     if (authKey !== env.DASHBOARD_SECRET) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized: Invalid dashboard key' }));
@@ -147,6 +150,131 @@ export async function handleDashboardRoute(
       return true;
     }
 
+    // GET /api/dashboard/daily-stats
+    if (req.method === 'GET' && url.pathname === '/api/dashboard/daily-stats') {
+      try {
+        const stats = await dailyReportService.getDailyStatistics();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(stats));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return true;
+    }
+
+    // POST /api/dashboard/trigger-daily-report
+    if (req.method === 'POST' && url.pathname === '/api/dashboard/trigger-daily-report') {
+      try {
+        if (botApi) {
+          await dailyReportService.sendDailyReport(botApi);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, message: 'Daily report dispatched to Telegram' }));
+        } else {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Bot API not available on this server' }));
+        }
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return true;
+    }
+
+    // GET /api/dashboard/export/users.csv
+    if (req.method === 'GET' && url.pathname === '/api/dashboard/export/users.csv') {
+      try {
+        const users = await userRepository.getAllUsers(500);
+        const headers = ['Telegram ID', 'Full Name', 'First Name', 'Last Name', 'Username', 'Is Bot', 'Messages Count', 'Files Count', 'Registered Date', 'Last Active'];
+        const rows = users.map(u => [
+          u.telegramId.toString(),
+          [u.firstName, u.lastName].filter(Boolean).join(' ') || 'Anonymous',
+          u.firstName || '',
+          u.lastName || '',
+          u.username ? `@${u.username}` : '',
+          u.isBot ? 'Yes' : 'No',
+          u.messageCount,
+          u.fileCount,
+          u.createdAt.toISOString(),
+          u.updatedAt.toISOString(),
+        ]);
+
+        const csvContent = '\uFEFF' + [headers, ...rows].map(row => row.map(escapeCsvField).join(',')).join('\r\n');
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="telegram_users_${Date.now()}.csv"`,
+        });
+        res.end(csvContent);
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return true;
+    }
+
+    // GET /api/dashboard/export/deleted.csv
+    if (req.method === 'GET' && url.pathname === '/api/dashboard/export/deleted.csv') {
+      try {
+        const deleted = await messageRepository.getRecentDeleted(500);
+        const headers = ['Sent Date', 'Deleted Date', 'Sender Name', 'Sender Username', 'User ID', 'Chat ID', 'Message Type', 'Full Text'];
+        const rows = deleted.map(d => [
+          d.createdAt.toISOString(),
+          d.deletedAt ? d.deletedAt.toISOString() : '',
+          d.senderName || 'Anonymous',
+          d.senderUsername ? `@${d.senderUsername}` : '',
+          d.userId,
+          d.chatId,
+          d.messageType,
+          d.fullText || '[Media File]',
+        ]);
+
+        const csvContent = '\uFEFF' + [headers, ...rows].map(row => row.map(escapeCsvField).join(',')).join('\r\n');
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="deleted_messages_${Date.now()}.csv"`,
+        });
+        res.end(csvContent);
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return true;
+    }
+
+    // GET /api/dashboard/export/threats.csv
+    if (req.method === 'GET' && url.pathname === '/api/dashboard/export/threats.csv') {
+      try {
+        const events = await prisma.fileEvent.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 500,
+        });
+        const headers = ['Date', 'Filename', 'Extension', 'Risk Level', 'Status', 'Size (Bytes)', 'SHA256', 'User ID', 'Chat ID', 'Impact Summary'];
+        const rows = events.map(e => [
+          e.createdAt.toISOString(),
+          e.filename,
+          e.extension,
+          e.riskLevel,
+          e.status,
+          e.size.toString(),
+          e.sha256,
+          e.userId,
+          e.chatId,
+          e.impactSummary,
+        ]);
+
+        const csvContent = '\uFEFF' + [headers, ...rows].map(row => row.map(escapeCsvField).join(',')).join('\r\n');
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="security_threats_${Date.now()}.csv"`,
+        });
+        res.end(csvContent);
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return true;
+    }
+
     // POST /api/dashboard/keywords
     if (req.method === 'POST' && url.pathname === '/api/dashboard/keywords') {
       try {
@@ -227,3 +355,10 @@ function parseJsonBody(req: http.IncomingMessage): Promise<any> {
     req.on('error', reject);
   });
 }
+
+function escapeCsvField(val: any): string {
+  if (val === null || val === undefined) return '""';
+  const str = String(val).replace(/"/g, '""');
+  return `"${str}"`;
+}
+

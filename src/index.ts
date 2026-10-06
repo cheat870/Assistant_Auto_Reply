@@ -4,6 +4,7 @@ import { getEnv } from './config/env.js';
 import { prisma } from './database/prisma.js';
 import { blockedExtensionRepository } from './database/repositories/blockedExtension.repository.js';
 import { createHttpServer } from './server/health.js';
+import { dailyReportService } from './services/dailyReport.service.js';
 import { rateLimitService } from './services/rateLimit.service.js';
 import { auditLogger, logger } from './utils/logger.js';
 
@@ -42,6 +43,9 @@ async function bootstrap() {
   server.listen(env.PORT, () => {
     logger.info(`🌐 Health server listening on port ${env.PORT} (/health, /ready)`);
   });
+
+  // 3.5. Start Daily 8:00 PM Summary Digest Scheduler
+  dailyReportService.startDailyScheduler(bot.api);
 
   // 4. Start Telegram Bot according to BOT_MODE
   let runner: { stop: () => Promise<void> } | null = null;

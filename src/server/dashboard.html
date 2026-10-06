@@ -293,6 +293,47 @@
           <button class="btn" style="background: rgba(255,255,255,0.1);" onclick="loadAllData()">🔄 Refresh ទិន្នន័យ</button>
         </div>
       </div>
+
+      <!-- Daily Digest Card -->
+      <div class="card" style="border: 1px solid rgba(59, 130, 246, 0.3); background: linear-gradient(135deg, rgba(18, 24, 38, 0.85) 0%, rgba(30, 58, 138, 0.2) 100%);">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 1.25rem;">📊</span>
+              <h3 class="card-title" style="color: #93c5fd;">របាយការណ៍សង្ខេបប្រចាំថ្ងៃ (Daily 8:00 PM Digest)</h3>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.825rem; margin-top: 0.25rem;">
+              ប្រព័ន្ធនឹងផ្ញើសារសង្ខេបស្វ័យប្រវត្តិកាន់ Telegram របស់លោកអ្នករៀងរាល់ម៉ោង <b>8:00 យប់ (ICT)</b>
+            </p>
+          </div>
+          <button class="btn" onclick="triggerSendDailyReport()" id="btnTriggerReport" style="background: #2563eb; font-size: 0.85rem; padding: 0.5rem 1rem;">
+            📤 ផ្ញើ Digest ចូល Telegram ឥឡូវនេះ
+          </button>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem;">
+          <div style="background: rgba(255,255,255,0.04); padding: 1rem; border-radius: 10px; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">👤 មនុស្សឆាតមកថ្ងៃនេះ</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #60a5fa; margin-top: 0.25rem;" id="dailyUsers">...</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.04); padding: 1rem; border-radius: 10px; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">💬 សារសរុបថ្ងៃនេះ</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #fff; margin-top: 0.25rem;" id="dailyMessages">...</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.04); padding: 1rem; border-radius: 10px; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">🤖 ឆ្លើយតបស្វ័យប្រវត្តិ</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #34d399; margin-top: 0.25rem;" id="dailyReplies">...</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.04); padding: 1rem; border-radius: 10px; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">🗑️ សារលុបថ្ងៃនេះ</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #f87171; margin-top: 0.25rem;" id="dailyDeleted">...</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.04); padding: 1rem; border-radius: 10px; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">🚨 ការព្រមានសុវត្ថិភាព</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #fbbf24; margin-top: 0.25rem;" id="dailyThreats">...</div>
+          </div>
+        </div>
+        <div id="dailyActiveNames" style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted);"></div>
+      </div>
     </div>
 
     <!-- Tab: Users -->
@@ -301,9 +342,14 @@
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <div>
             <h3 class="card-title">👥 បញ្ជីឈ្មោះអ្នកប្រើប្រាស់ (Users Directory)</h3>
-            <p style="color: var(--text-muted); font-size: 0.825rem; margin-top: 0.25rem;">អ្នកដែលធ្លាប់បានឆាតមកកាន់ Bot ឬ Telegram Business របស់អ្នក</p>
+            <p style="color: var(--text-muted); font-size: 0.825rem; margin-top: 0.25rem;">អ្នកដែលធ្លាប់បានឆាតមកកាន់គណនី ឬ Telegram ផ្ទាល់ខ្លួនរបស់អ្នក</p>
           </div>
-          <input type="text" id="userSearchInput" placeholder="🔍 ស្វែងរកតាមឈ្មោះ, Username, ID..." oninput="filterUsers()" style="max-width: 300px; font-size: 0.85rem;">
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="userSearchInput" placeholder="🔍 ស្វែងរកតាមឈ្មោះ, Username, ID..." oninput="filterUsers()" style="max-width: 250px; font-size: 0.85rem;">
+            <button class="btn" onclick="exportCsv('/api/dashboard/export/users.csv', 'telegram_users.csv')" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.85rem; padding: 0.5rem 0.9rem;">
+              📥 Export CSV
+            </button>
+          </div>
         </div>
         <table id="usersTable">
           <thead>
@@ -325,8 +371,11 @@
     <!-- Tab 2: Deleted Messages -->
     <div id="tab-deleted" class="hidden">
       <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <h3 class="card-title">🗑️ បណ្ណសារសារដែលគេបានលុប (Deleted Messages Timeline)</h3>
+          <button class="btn" onclick="exportCsv('/api/dashboard/export/deleted.csv', 'deleted_messages.csv')" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.85rem; padding: 0.5rem 0.9rem;">
+            📥 Export CSV
+          </button>
         </div>
         <table id="deletedTable">
           <thead>
@@ -347,8 +396,11 @@
     <!-- Tab 3: Threats -->
     <div id="tab-threats" class="hidden">
       <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <h3 class="card-title">🚨 របាយការណ៍ស្កេនមេរោគ និង Phishing Links</h3>
+          <button class="btn" onclick="exportCsv('/api/dashboard/export/threats.csv', 'security_threats.csv')" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.85rem; padding: 0.5rem 0.9rem;">
+            📥 Export CSV
+          </button>
         </div>
         <table id="threatsTable">
           <thead>
@@ -518,6 +570,7 @@
     async function loadAllData() {
       const headers = { 'x-dashboard-key': authToken };
       loadUsers();
+      loadDailyStats();
       
       // Stats
       try {
@@ -582,6 +635,82 @@
           `).join('');
         }
       } catch (e) {}
+    }
+
+    async function loadDailyStats() {
+      const headers = { 'x-dashboard-key': authToken };
+      try {
+        const stats = await fetch('/api/dashboard/daily-stats', { headers }).then(r => r.json());
+        const usersEl = document.getElementById('dailyUsers');
+        const msgsEl = document.getElementById('dailyMessages');
+        const repEl = document.getElementById('dailyReplies');
+        const delEl = document.getElementById('dailyDeleted');
+        const thrEl = document.getElementById('dailyThreats');
+
+        if (usersEl) usersEl.innerText = `${stats.activeUsersCount || 0} នាក់`;
+        if (msgsEl) msgsEl.innerText = `${stats.messagesToday || 0} សារ`;
+        if (repEl) repEl.innerText = `${stats.autoRepliesToday || 0} ដង`;
+        if (delEl) delEl.innerText = `${stats.deletedToday || 0} សារ`;
+        if (thrEl) thrEl.innerText = `${stats.threatsToday || 0} ករណី`;
+
+        const namesEl = document.getElementById('dailyActiveNames');
+        if (namesEl) {
+          if (stats.activeUserNames && stats.activeUserNames.length > 0) {
+            namesEl.innerHTML = `👤 <b>សកម្មភាពថ្មីៗថ្ងៃនេះ៖</b> ${stats.activeUserNames.map(n => escapeHtml(n)).join(', ')}`;
+          } else {
+            namesEl.innerHTML = `<i>មិនទាន់មានមនុស្សឆាតមកនៅថ្ងៃនេះទេ។</i>`;
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function triggerSendDailyReport() {
+      const btn = document.getElementById('btnTriggerReport');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = '⏳ កំពុងផ្ញើ...';
+      }
+      try {
+        const res = await fetch('/api/dashboard/trigger-daily-report', {
+          method: 'POST',
+          headers: { 'x-dashboard-key': authToken }
+        });
+        if (res.ok) {
+          alert('✅ បានផ្ញើរបាយការណ៍សង្ខេប (Daily Digest) ទៅកាន់ Telegram របស់អ្នករួចរាល់ហើយ!');
+        } else {
+          alert('❌ មិនអាចផ្ញើរបាយការណ៍បានទេ (សូមពិនិត្យ Secret Key)');
+        }
+      } catch (e) {
+        alert('❌ បរាជ័យក្នុងការតភ្ជាប់ទៅកាន់ Server');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = '📤 ផ្ញើ Digest ចូល Telegram ឥឡូវនេះ';
+        }
+      }
+    }
+
+    async function exportCsv(endpoint, defaultFilename) {
+      try {
+        const res = await fetch(endpoint, {
+          headers: { 'x-dashboard-key': authToken }
+        });
+        if (!res.ok) {
+          alert('❌ បរាជ័យក្នុងការទាញយក CSV (សូម Login ម្តងទៀត)');
+          return;
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = defaultFilename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        alert('❌ មានបញ្ហាក្នុងការទាញយក CSV');
+      }
     }
 
     async function addKeyword() {

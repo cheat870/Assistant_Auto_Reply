@@ -16,7 +16,7 @@ export function createHttpServer(bot: Bot<BotContext>): http.Server {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
 
     // Handle Web Admin Dashboard and Dashboard API
-    const handledDashboard = await handleDashboardRoute(req, res, url);
+    const handledDashboard = await handleDashboardRoute(req, res, url, bot.api);
     if (handledDashboard) return;
 
     // GET /health or HEAD /health (and root /) - Liveness probe
