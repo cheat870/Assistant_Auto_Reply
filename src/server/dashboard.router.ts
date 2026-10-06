@@ -8,6 +8,7 @@ import { adminService } from '../services/admin.service.js';
 import { keywordRepository } from '../database/repositories/keyword.repository.js';
 import { messageRepository } from '../database/repositories/message.repository.js';
 import { botSettingRepository } from '../database/repositories/botSetting.repository.js';
+import { userRepository } from '../database/repositories/user.repository.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,6 +65,33 @@ export async function handleDashboardRoute(
         const deletedCount = await prisma.messageEvent.count({ where: { isDeleted: true } });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ...stats, deletedMessagesCount: deletedCount }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return true;
+    }
+
+    // GET /api/dashboard/users
+    if (req.method === 'GET' && url.pathname === '/api/dashboard/users') {
+      try {
+        const users = await userRepository.getAllUsers(100);
+        const sanitized = users.map(u => ({
+          id: u.id,
+          telegramId: u.telegramId.toString(),
+          firstName: u.firstName || '',
+          lastName: u.lastName || '',
+          fullName: [u.firstName, u.lastName].filter(Boolean).join(' ') || 'Anonymous',
+          username: u.username ? `@${u.username}` : null,
+          usernameRaw: u.username || null,
+          isBot: u.isBot,
+          messageCount: u.messageCount,
+          fileCount: u.fileCount,
+          createdAt: u.createdAt,
+          updatedAt: u.updatedAt,
+        }));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(sanitized));
       } catch (err: any) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));

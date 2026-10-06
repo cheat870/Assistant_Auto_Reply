@@ -159,6 +159,20 @@
     .tag-warning { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
     .tag-blue { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
     
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    
     .btn {
       background: var(--primary);
       color: white;
@@ -235,18 +249,19 @@
       <span class="badge">Live 24/7</span>
     </div>
     <div class="nav-tabs">
-      <button class="nav-tab active" onclick="switchTab('overview')">📊 ស្ថិតិទូទៅ</button>
-      <button class="nav-tab" onclick="switchTab('deleted')">🗑️ សារដែលគេលុប</button>
-      <button class="nav-tab" onclick="switchTab('threats')">🚨 របាយការណ៍សន្តិសុខ</button>
-      <button class="nav-tab" onclick="switchTab('keywords')">⚙️ ការឆ្លើយតប</button>
+      <button class="nav-tab active" data-tab="overview" onclick="switchTab('overview')">📊 ស្ថិតិទូទៅ</button>
+      <button class="nav-tab" data-tab="users" onclick="switchTab('users')">👥 អ្នកប្រើប្រាស់</button>
+      <button class="nav-tab" data-tab="deleted" onclick="switchTab('deleted')">🗑️ សារដែលគេលុប</button>
+      <button class="nav-tab" data-tab="threats" onclick="switchTab('threats')">🚨 របាយការណ៍សន្តិសុខ</button>
+      <button class="nav-tab" data-tab="keywords" onclick="switchTab('keywords')">⚙️ ការឆ្លើយតប</button>
     </div>
   </nav>
 
   <div class="container">
     <!-- Quick Stats -->
     <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-title">👤 អ្នកប្រើប្រាស់សរុប</div>
+      <div class="stat-card" style="cursor: pointer; transition: all 0.2s;" onclick="switchTab('users')" title="ចុចដើម្បីមើលបញ្ជីឈ្មោះអ្នកប្រើប្រាស់">
+        <div class="stat-title">👤 អ្នកប្រើប្រាស់សរុប ↗</div>
         <div class="stat-value" id="statUsers">...</div>
       </div>
       <div class="stat-card">
@@ -277,6 +292,33 @@
           <button class="btn" onclick="toggleBusyMode()" id="btnBusyMode">🔄 ប្តូរស្ថានភាព Busy Mode</button>
           <button class="btn" style="background: rgba(255,255,255,0.1);" onclick="loadAllData()">🔄 Refresh ទិន្នន័យ</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Tab: Users -->
+    <div id="tab-users" class="hidden">
+      <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h3 class="card-title">👥 បញ្ជីឈ្មោះអ្នកប្រើប្រាស់ (Users Directory)</h3>
+            <p style="color: var(--text-muted); font-size: 0.825rem; margin-top: 0.25rem;">អ្នកដែលធ្លាប់បានឆាតមកកាន់ Bot ឬ Telegram Business របស់អ្នក</p>
+          </div>
+          <input type="text" id="userSearchInput" placeholder="🔍 ស្វែងរកតាមឈ្មោះ, Username, ID..." oninput="filterUsers()" style="max-width: 300px; font-size: 0.85rem;">
+        </div>
+        <table id="usersTable">
+          <thead>
+            <tr>
+              <th>ឈ្មោះអ្នកប្រើប្រាស់ (Name)</th>
+              <th>Username</th>
+              <th>Telegram ID</th>
+              <th>ចំនួនសារ (Messages)</th>
+              <th>កាលបរិច្ឆេទសកម្មចុងក្រោយ</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody">
+            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">កំពុងទាញយក...</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -395,15 +437,87 @@
 
     function switchTab(tab) {
       document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-      ['overview', 'deleted', 'threats', 'keywords'].forEach(t => {
-        document.getElementById('tab-' + t).classList.add('hidden');
+      ['overview', 'users', 'deleted', 'threats', 'keywords'].forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        if (el) el.classList.add('hidden');
       });
-      event.target.classList.add('active');
-      document.getElementById('tab-' + tab).classList.remove('hidden');
+      const activeBtn = document.querySelector(`.nav-tab[data-tab="${tab}"]`) || (window.event?.target && window.event.target.classList.contains('nav-tab') ? window.event.target : null);
+      if (activeBtn) activeBtn.classList.add('active');
+      const target = document.getElementById('tab-' + tab);
+      if (target) target.classList.remove('hidden');
+      if (tab === 'users') loadUsers();
+    }
+
+    let allUsers = [];
+
+    async function loadUsers() {
+      const headers = { 'x-dashboard-key': authToken };
+      const tbody = document.getElementById('usersBody');
+      try {
+        const users = await fetch('/api/dashboard/users', { headers }).then(r => r.json());
+        allUsers = Array.isArray(users) ? users : [];
+        renderUsers(allUsers);
+      } catch (e) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--danger);">មានបញ្ហាក្នុងការទាញយកទិន្នន័យអ្នកប្រើប្រាស់</td></tr>';
+      }
+    }
+
+    function renderUsers(usersList) {
+      const tbody = document.getElementById('usersBody');
+      if (!tbody) return;
+      if (usersList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">មិនមានអ្នកប្រើប្រាស់ត្រូវបានរកឃើញឡើយ។</td></tr>';
+        return;
+      }
+      tbody.innerHTML = usersList.map(u => {
+        const initial = (u.fullName || 'U').charAt(0).toUpperCase();
+        const handleHtml = u.usernameRaw 
+          ? `<a href="https://t.me/${escapeHtml(u.usernameRaw)}" target="_blank" style="color: #60a5fa; text-decoration: none; font-weight: 500;">@${escapeHtml(u.usernameRaw)} ↗</a>` 
+          : `<span style="color: var(--text-muted); font-style: italic;">គ្មាន Username</span>`;
+        const botBadge = u.isBot ? `<span class="tag tag-warning" style="margin-left: 6px;">BOT</span>` : '';
+        const filesBadge = u.fileCount > 0 ? `<span class="tag tag-warning" style="margin-left: 4px;">${u.fileCount} ឯកសារ</span>` : '';
+        const lastSeen = u.updatedAt ? new Date(u.updatedAt).toLocaleString() : 'N/A';
+
+        return `
+          <tr>
+            <td>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div class="user-avatar">${initial}</div>
+                <div>
+                  <div style="font-weight: 600; color: #fff;">${escapeHtml(u.fullName)}${botBadge}</div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted);">ចុះឈ្មោះ: ${new Date(u.createdAt).toLocaleDateString()}</div>
+                </div>
+              </div>
+            </td>
+            <td>${handleHtml}</td>
+            <td><code style="background: rgba(255,255,255,0.06); padding: 0.2rem 0.4rem; border-radius: 4px;">${escapeHtml(u.telegramId)}</code></td>
+            <td>
+              <span class="tag tag-blue">${u.messageCount || 0} សារ</span>
+              ${filesBadge}
+            </td>
+            <td style="color: var(--text-muted); font-size: 0.825rem;">${lastSeen}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterUsers() {
+      const query = (document.getElementById('userSearchInput')?.value || '').toLowerCase().trim();
+      if (!query) {
+        renderUsers(allUsers);
+        return;
+      }
+      const filtered = allUsers.filter(u => 
+        (u.fullName && u.fullName.toLowerCase().includes(query)) ||
+        (u.usernameRaw && u.usernameRaw.toLowerCase().includes(query)) ||
+        (u.telegramId && u.telegramId.includes(query))
+      );
+      renderUsers(filtered);
     }
 
     async function loadAllData() {
       const headers = { 'x-dashboard-key': authToken };
+      loadUsers();
       
       // Stats
       try {

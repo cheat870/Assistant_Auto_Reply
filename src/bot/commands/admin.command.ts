@@ -1,6 +1,7 @@
 import { InlineKeyboard } from 'grammy';
 import { getEnv } from '../../config/env.js';
 import { botSettingRepository } from '../../database/repositories/botSetting.repository.js';
+import { userRepository } from '../../database/repositories/user.repository.js';
 import { getChatLanguage, t } from '../../i18n/index.js';
 import { adminService } from '../../services/admin.service.js';
 import { autoReplyService } from '../../services/autoReply.service.js';
@@ -266,5 +267,46 @@ export async function handleArchiveCommand(ctx: BotContext): Promise<void> {
     `រាល់ Bank Slips, Deleted Messages, និង Phishing Threats នឹងត្រូវបាញ់ចូល Channel នេះដោយស្វ័យប្រវត្តិ។`,
     { parse_mode: 'HTML' }
   );
+}
+
+/**
+ * Admin command: /users
+ * Lists registered users with names, usernames, and activity stats.
+ */
+export async function handleUsersCommand(ctx: BotContext): Promise<void> {
+  const users = await userRepository.getAllUsers(30);
+
+  if (users.length === 0) {
+    await ctx.reply(
+      '👥 <b>បញ្ជីឈ្មោះអ្នកប្រើប្រាស់ (Users List)៖</b>\n\n<i>មិនទាន់មានអ្នកប្រើប្រាស់នៅក្នុងប្រព័ន្ធនៅឡើយទេ។</i>',
+      { parse_mode: 'HTML' }
+    );
+    return;
+  }
+
+  const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const lines = [
+    `👥 <b>បញ្ជីឈ្មោះអ្នកប្រើប្រាស់សរុប (${users.length} នាក់)៖</b>`,
+    `<i>អ្នកដែលបានឆាតមកកាន់ Bot ឬ Business Secretary របស់អ្នក៖</i>`,
+    ``,
+  ];
+
+  for (let i = 0; i < users.length; i++) {
+    const u = users[i]!;
+    const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ') || 'Anonymous';
+    const handle = u.username ? `@${u.username}` : 'គ្មាន Username';
+    const lastSeen = u.updatedAt ? u.updatedAt.toLocaleString('km-KH') : 'N/A';
+    const botTag = u.isBot ? ' 🤖 [Bot]' : '';
+
+    lines.push(`<b>${i + 1}. 👤 ${escape(fullName)}</b>${botTag}`);
+    lines.push(`   • Handle: <b>${escape(handle)}</b>`);
+    lines.push(`   • Telegram ID: <code>${u.telegramId.toString()}</code>`);
+    lines.push(`   • ចំនួនសារ: <b>${u.messageCount}</b> សារ (ឯកសារ: ${u.fileCount})`);
+    lines.push(`   • សកម្មចុងក្រោយ: <i>${lastSeen}</i>`);
+    lines.push(``);
+  }
+
+  await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
 }
 

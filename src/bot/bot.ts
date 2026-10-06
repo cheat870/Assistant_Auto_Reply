@@ -17,6 +17,7 @@ import {
   handlePendingCommand,
   handleSettingsCommand,
   handleStatsCommand,
+  handleUsersCommand,
 } from './commands/admin.command.js';
 import {
   handleAddBlockedCommand,
@@ -104,6 +105,7 @@ export function createBot(): Bot<BotContext> {
   bot.command('busy', requireAdmin, handleBusyCommand);
   bot.command(['deleted', 'deleted_messages'], requireAdmin, handleDeletedCommand);
   bot.command('archive', requireAdmin, handleArchiveCommand);
+  bot.command('users', requireAdmin, handleUsersCommand);
 
   // Keyword Management Commands
   bot.command('keywords', requireAdmin, handleKeywordsCommand);

@@ -59,6 +59,31 @@ export class UserRepository {
       where: { autoReplied: true },
     });
   }
+
+  async getAllUsers(limit = 100) {
+    const users = await prisma.user.findMany({
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+    });
+
+    const usersWithCounts = await Promise.all(
+      users.map(async u => {
+        const msgCount = await prisma.messageEvent.count({
+          where: { userId: u.telegramId.toString() },
+        });
+        const fileCount = await prisma.fileEvent.count({
+          where: { userId: u.telegramId.toString() },
+        });
+        return {
+          ...u,
+          messageCount: msgCount,
+          fileCount: fileCount,
+        };
+      })
+    );
+
+    return usersWithCounts;
+  }
 }
 
 export const userRepository = new UserRepository();
