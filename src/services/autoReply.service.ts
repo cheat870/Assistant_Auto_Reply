@@ -1,4 +1,5 @@
 import type { MatchType } from '@prisma/client';
+import { getEnv } from '../config/env.js';
 import { botSettingRepository } from '../database/repositories/botSetting.repository.js';
 import { keywordRepository } from '../database/repositories/keyword.repository.js';
 
@@ -12,14 +13,47 @@ export interface AutoReplyResult {
 
 export class AutoReplyService {
   /**
+   * Checks whether automated replies in chats are enabled.
+   * Defaults to false (Silent Mode) to avoid interrupting personal chats.
+   */
+  async isAutoReplyEnabled(): Promise<boolean> {
+    try {
+      const dbSetting = await botSettingRepository.getSetting('AUTO_REPLY_ENABLED');
+      if (dbSetting !== null) {
+        return dbSetting === 'true' || dbSetting === '1';
+      }
+    } catch {
+      // In case DB call fails or uninitialized in unit test
+    }
+    try {
+      const env = getEnv();
+      return env.AUTO_REPLY_ENABLED;
+    } catch {
+      return false;
+    }
+  }
+
+  async setAutoReplyEnabled(enabled: boolean): Promise<void> {
+    await botSettingRepository.setSetting(
+      'AUTO_REPLY_ENABLED',
+      enabled ? 'true' : 'false',
+      'Master switch for auto-replying in chats'
+    );
+  }
+
+  /**
    * Matches an incoming user text against configured keywords or universal busy mode.
    * Priority:
-   * 1. If BUSY_MODE is active: responds with busy reply for ALL incoming messages.
-   * 2. Otherwise: matches configured keywords by priority (Highest first).
-   * 3. Fallback: if no keyword matches, returns fallback reply if configured.
+   * 1. If AUTO_REPLY_ENABLED is false: returns null (Silent Mode).
+   * 2. If BUSY_MODE is active: responds with busy reply for ALL incoming messages.
+   * 3. Otherwise: matches configured keywords by priority (Highest first).
+   * 4. Fallback: if no keyword matches, returns fallback reply if configured.
    */
   async findReply(text: string, chatDbId?: string | null): Promise<AutoReplyResult | null> {
     if (!text || typeof text !== 'string') return null;
+
+    const isEnabled = await this.isAutoReplyEnabled();
+    if (!isEnabled) return null;
 
     try {
       const busySetting = await botSettingRepository.getSetting('BUSY_MODE');

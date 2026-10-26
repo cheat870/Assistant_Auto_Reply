@@ -47,17 +47,21 @@ export async function handleAudioOrVideoMessage(ctx: BotContext): Promise<void> 
           const buffer = Buffer.from(await res.arrayBuffer());
           const transcription = await aiService.transcribeVoiceNote(buffer, media.mime_type || 'audio/ogg');
           if (transcription) {
-            const replyMsg =
-              `🎙️ <b>បម្លែងសំឡេងជាអក្សរ (Voice Note Transcription)៖</b>\n\n` +
-              `<i>"${transcription.transcript}"</i>\n\n` +
-              `💡 <b>សេចក្តីសង្ខេប៖</b> ${transcription.summaryKhmer}`;
+            const senderName = msg?.from?.first_name || 'ភ្ញៀវ';
+            const senderHandle = msg?.from?.username ? `@${msg.from.username}` : `ID: ${msg?.from?.id}`;
 
-            const businessConnId = ctx.businessMessage?.business_connection_id;
-            await ctx.reply(replyMsg, {
-              ...(businessConnId ? { business_connection_id: businessConnId } : {}),
-              reply_to_message_id: msg?.message_id,
-              parse_mode: 'HTML',
-            });
+            // Deliver silently to Private Archive Channel so SOCHEAT can read it
+            const channelId = await channelArchiveService.getChannelId();
+            if (channelId) {
+              await ctx.api.sendMessage(
+                channelId,
+                `🎙️ <b>[សំឡេងជាអក្សរ - VOICE TRANSCRIPTION]</b>\n\n` +
+                `👤 <b>អ្នកផ្ញើ៖</b> ${senderName} (${senderHandle})\n` +
+                `💬 <b>ខ្លឹមសារ៖</b> <i>"${transcription.transcript}"</i>\n\n` +
+                `💡 <b>សេចក្តីសង្ខេប៖</b> ${transcription.summaryKhmer}`,
+                { parse_mode: 'HTML' }
+              ).catch(() => {});
+            }
             return;
           }
         }
@@ -120,22 +124,7 @@ export async function handlePhotoMessage(ctx: BotContext): Promise<void> {
     const slip = await aiService.analyzeBankSlip(buffer, 'image/jpeg');
 
     if (slip && slip.isBankSlip && slip.status === 'VERIFIED') {
-      const msg =
-        `🧾 <b>បានរកឃើញវិក្កយបត្រផ្ទេរប្រាក់ (Bank Transfer Detected)</b>\n\n` +
-        `• <b>ធនាគារ៖</b> ${slip.bankName || 'Unknown Bank'}\n` +
-        `• <b>ចំនួនទឹកប្រាក់៖</b> <b>${slip.amount || 'N/A'} ${slip.currency || ''}</b>\n` +
-        `• <b>លេខកូដប្រតិបត្តិការ (TxID)៖</b> <code>${slip.transactionId || 'N/A'}</code>\n` +
-        (slip.senderName ? `• <b>អ្នកផ្ញើ៖</b> ${slip.senderName}\n` : '') +
-        (slip.receiverName ? `• <b>អ្នកទទួល៖</b> ${slip.receiverName}\n` : '') +
-        (slip.dateTime ? `• <b>កាលបរិច្ឆេទ៖</b> ${slip.dateTime}\n` : '') +
-        `\n✅ <b>ស្ថានភាព៖</b> វិក្កយបត្រត្រឹមត្រូវ (បានកត់ត្រាទុកជូន SOCHEAT រួចរាល់)`;
-
-      await ctx.reply(msg, {
-        reply_to_message_id: incoming?.message_id,
-        parse_mode: 'HTML',
-      });
-
-      // Archive bank slip to Private Channel
+      // Archive bank slip silently to Private Channel (Do NOT reply into user chat)
       if (ctx.chat) {
         await channelArchiveService.archiveBankSlip(
           ctx.api,
@@ -154,24 +143,27 @@ export async function handlePhotoMessage(ctx: BotContext): Promise<void> {
       const escape = (s?: string) => (s ? s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'N/A');
 
       if (qr.qrType === 'TELEGRAM_LOGIN' || qr.isPhishingOrSuspicious) {
-        const warning = [
-          `🚨 <b>ការព្រមានសុវត្ថិភាព QR CODE (DANGEROUS QR PHISHING ALERT)</b>`,
-          ``,
-          `⚠️ <b>ប្រភេទ QR៖</b> <code>${qr.qrType}</code>`,
-          `🔴 <b>កម្រិតគ្រោះថ្នាក់៖</b> <b>CRITICAL (គ្រោះថ្នាក់ខ្ពស់បំផុត)</b>`,
-          qr.qrType === 'TELEGRAM_LOGIN'
-            ? `❌ <b>ការព្រមានជាបន្ទាន់៖ នេះជា Telegram Login QR Code! ប្រសិនបើអ្នកស្កេន ជនខិលខូចនឹងអាចលួចគ្រប់គ្រងគណនី Telegram របស់អ្នកភ្លាមៗ (Account Takeover)!</b>\n`
-            : '',
-          `🔍 <b>ខ្លឹមសារកូដ៖</b> <code>${escape(qr.decodedContent)}</code>`,
-          `💡 <b>ការវិភាគ៖</b> ${qr.summaryKhmer}`,
-          ``,
-          `❌ <b>សូមកុំស្កេន QR Code នេះជាដាច់ខាត!</b>`,
-        ].filter(Boolean).join('\n');
+        // Alert Admin directly in Telegram PM so SOCHEAT knows without replying in chat
+        const sender = incoming?.from?.first_name || 'ភ្ញៀវ';
+        const senderHandle = incoming?.from?.username ? `@${incoming.from.username}` : `ID: ${incoming?.from?.id || 'unknown'}`;
 
-        await ctx.reply(warning, {
-          reply_to_message_id: incoming?.message_id,
-          parse_mode: 'HTML',
-        });
+        for (const adminId of env.ADMIN_IDS) {
+          try {
+            await ctx.api.sendMessage(
+              adminId.toString(),
+              `🚨 <b>ការព្រមាន DANGEROUS QR CODE!</b>\n\n` +
+              `👤 <b>អ្នកផ្ញើ៖</b> ${sender} (${senderHandle})\n` +
+              `⚠️ <b>ប្រភេទ QR៖</b> <code>${qr.qrType}</code>\n` +
+              `🔴 <b>កម្រិតគ្រោះថ្នាក់៖</b> <b>CRITICAL (លួចគណនី Telegram Login)</b>\n` +
+              `🔍 <b>កូដ៖</b> <code>${escape(qr.decodedContent)}</code>\n` +
+              `💡 <b>វិភាគ៖</b> ${qr.summaryKhmer}\n\n` +
+              `❌ <i>សូមកុំស្កេនរូបភាព QR នេះជាដាច់ខាត!</i>`,
+              { parse_mode: 'HTML' }
+            );
+          } catch {
+            // ignore send error
+          }
+        }
 
         if (ctx.chat) {
           await channelArchiveService.archiveSecurityThreat(ctx.api, {
@@ -188,15 +180,8 @@ export async function handlePhotoMessage(ctx: BotContext): Promise<void> {
       }
 
       if (qr.qrType === 'PAYMENT_KHQR') {
-        await ctx.reply(
-          `💳 <b>បានស្គាល់ QR កូដទូទាត់ប្រាក់ (Payment KHQR)</b>\n\n` +
-          `• <b>ទិន្នន័យ៖</b> <code>${escape(qr.decodedContent)}</code>\n` +
-          `• <b>ស្ថានភាព៖</b> មានសុវត្ថិភាព (Safe Payment Code)`,
-          {
-            reply_to_message_id: incoming?.message_id,
-            parse_mode: 'HTML',
-          }
-        );
+        // KHQR payment code recognized - silently record or ignore (No reply in chat)
+        return;
       }
     }
   } catch (err) {

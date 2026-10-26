@@ -15,22 +15,27 @@ async function bootstrap() {
     '🚀 Initializing Telegram Security Bot...'
   );
 
-  // 1. Seed default blocked extensions & settings in database
+  // 1. Seed default blocked extensions & settings in database (Silent Mode / No Auto-Reply by default)
   try {
     await blockedExtensionRepository.seedDefaultsIfEmpty();
-    const settingsCount = await prisma.botSetting.count();
-    if (settingsCount === 0) {
-      const busyMsg = 'សូមរង់ចាំការឆ្លើយតបពី SOCHEAT បន្តិច ពេលនេះគាត់កំពុងជាប់រវល់។';
-      await prisma.botSetting.createMany({
-        data: [
-          { key: 'BUSY_MODE', value: 'true', description: 'Enable universal busy auto-reply' },
-          { key: 'BUSY_REPLY_TEXT', value: busyMsg, description: 'Universal busy reply message' },
-          { key: 'FALLBACK_REPLY_TEXT', value: busyMsg, description: 'Fallback reply message' },
-        ],
+    const busyMsg = 'សូមរង់ចាំការឆ្លើយតបពី SOCHEAT បន្តិច ពេលនេះគាត់កំពុងជាប់រវល់។';
+    await prisma.botSetting.upsert({
+      where: { key: 'AUTO_REPLY_ENABLED' },
+      update: { value: 'false' },
+      create: { key: 'AUTO_REPLY_ENABLED', value: 'false', description: 'Master switch for auto-replying in chats' },
+    });
+    await prisma.botSetting.upsert({
+      where: { key: 'BUSY_MODE' },
+      update: { value: 'false' },
+      create: { key: 'BUSY_MODE', value: 'false', description: 'Enable universal busy auto-reply' },
+    });
+    const fallback = await prisma.botSetting.findUnique({ where: { key: 'FALLBACK_REPLY_TEXT' } });
+    if (!fallback) {
+      await prisma.botSetting.create({
+        data: { key: 'FALLBACK_REPLY_TEXT', value: busyMsg, description: 'Fallback reply message' },
       });
-      logger.info('Default bot settings seeded.');
     }
-    logger.info('Default database records verified.');
+    logger.info('Default database records verified. Silent Mode active (Auto-Reply disabled).');
   } catch (err) {
     logger.warn({ err }, 'Could not seed defaults (database may not be connected yet)');
   }

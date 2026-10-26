@@ -10,6 +10,13 @@ describe('AutoReplyService Tests', () => {
     service = new AutoReplyService();
     vi.restoreAllMocks();
     vi.spyOn(botSettingRepository, 'getSetting').mockResolvedValue(null);
+    vi.spyOn(service, 'isAutoReplyEnabled').mockResolvedValue(true);
+  });
+
+  it('should return null when auto reply is disabled (Silent Mode)', async () => {
+    vi.spyOn(service, 'isAutoReplyEnabled').mockResolvedValue(false);
+    const result = await service.findReply('hello');
+    expect(result).toBeNull();
   });
 
   it('should match EXACT keywords case-insensitively', async () => {

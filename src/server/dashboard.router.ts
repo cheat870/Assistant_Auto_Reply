@@ -10,6 +10,7 @@ import { keywordRepository } from '../database/repositories/keyword.repository.j
 import { messageRepository } from '../database/repositories/message.repository.js';
 import { botSettingRepository } from '../database/repositories/botSetting.repository.js';
 import { userRepository } from '../database/repositories/user.repository.js';
+import { autoReplyService } from '../services/autoReply.service.js';
 import { dailyReportService } from '../services/dailyReport.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -308,6 +309,24 @@ export async function handleDashboardRoute(
         await keywordRepository.deleteKeyword(id);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return true;
+    }
+
+    // GET /api/dashboard/settings
+    if (req.method === 'GET' && url.pathname === '/api/dashboard/settings') {
+      try {
+        const autoReply = await autoReplyService.isAutoReplyEnabled();
+        const busyMode = await autoReplyService.getBusyMode();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          autoReplyEnabled: autoReply,
+          busyMode: busyMode.enabled,
+          busyText: busyMode.text,
+        }));
       } catch (err: any) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));

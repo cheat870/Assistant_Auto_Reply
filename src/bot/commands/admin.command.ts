@@ -331,3 +331,54 @@ export async function handleDailyReportCommand(ctx: BotContext): Promise<void> {
   }
 }
 
+/**
+ * Command /silent or /autoreply [on|off]
+ * Views or toggles Silent Mode (No Auto-Reply in chats).
+ */
+export async function handleSilentCommand(ctx: BotContext): Promise<void> {
+  const rawText = ctx.message?.text?.trim() || '';
+  const parts = rawText.split(/\s+/);
+  const arg = parts.slice(1).join(' ').trim().toLowerCase();
+
+  const isEnabled = await autoReplyService.isAutoReplyEnabled();
+
+  if (!arg) {
+    const statusMsg = !isEnabled
+      ? `🔇 <b>របៀបដំណើរការស្ងាត់ (SILENT MODE)៖ កំពុងបើក (ACTIVE)</b>\n\n` +
+        `✅ <b>Bot នឹងមិនផ្ញើសារឆ្លើយតប (No Auto-Reply) ទៅកាន់អ្នកដែលឆាតមកឡើយ!</b>\n\n` +
+        `🛡️ <b>មុខងារដែលនៅតែដំណើរការស្ងាត់ៗ៖</b>\n` +
+        `• កត់ត្រាសារ និងតាមដានសារលុប (Anti-Delete Tracking)\n` +
+        `• បាញ់សារលុប និងវិក្កយបត្រ Bank Slip ចូល Private Archive Channel\n` +
+        `• ស្កេនមេរោគ និងតំណភ្ជាប់ Phishing ហើយរាយការណ៍ជូន Admin ផ្ទាល់\n` +
+        `• ផ្ញើរបាយការណ៍សង្ខេបប្រចាំថ្ងៃម៉ោង 8:00 យប់\n\n` +
+        `📖 <i>ប្រសិនបើអ្នកចង់បើកឱ្យ Bot ឆ្លើយតបវិញ សូមវាយ៖ <code>/autoreply on</code></i>`
+      : `🔊 <b>ស្ថានភាពឆ្លើយតប (AUTO-REPLY MODE)៖ កំពុងបើក (ON)</b>\n\n` +
+        `Bot នឹងឆ្លើយតបទៅកាន់សារដែលផ្ញើមក។\n\n` +
+        `📖 <i>ដើម្បីបិទការឆ្លើយតប (ដាក់ឱ្យស្ងាត់ Silent Mode) សូមវាយ៖ <code>/autoreply off</code> ឬ <code>/silent</code></i>`;
+
+    await ctx.reply(statusMsg, { parse_mode: 'HTML' });
+    return;
+  }
+
+  if (arg === 'off' || arg === 'true' || arg === 'silent') {
+    await autoReplyService.setAutoReplyEnabled(false);
+    await autoReplyService.setBusyMode(false);
+    await ctx.reply(
+      `🔇 <b>បានកំណត់ទៅជា Silent Mode រួចរាល់!</b>\n\n` +
+      `Bot នឹងមិនផ្ញើសារឆ្លើយតប (No Auto-Reply) ទៅកាន់អ្នកដែលឆាតមកទៀតទេ ដោយដំណើរការកត់ត្រា និងការពារសុវត្ថិភាពដោយស្ងៀមស្ងាត់។`,
+      { parse_mode: 'HTML' }
+    );
+    return;
+  }
+
+  if (arg === 'on' || arg === 'false') {
+    await autoReplyService.setAutoReplyEnabled(true);
+    await ctx.reply(
+      `🔊 <b>បានបើកការឆ្លើយតប (Auto-Reply Enabled)!</b>\n\n` +
+      `Bot នឹងចាប់ផ្តើមឆ្លើយតបសារឡើងវិញ។`,
+      { parse_mode: 'HTML' }
+    );
+    return;
+  }
+}
+

@@ -101,11 +101,13 @@ export class FileProtectionService {
       }
 
       const businessConnId = (ctx as any).businessMessage?.business_connection_id;
-      await ctx.reply(warningMsg, {
-        ...(businessConnId ? { business_connection_id: businessConnId } : {}),
-        reply_to_message_id: messageId,
-        parse_mode: 'HTML',
-      });
+      // In Silent Mode or in Business chats, do not reply into the chat
+      if (ctx.chat.type === 'private' && !businessConnId) {
+        await ctx.reply(warningMsg, {
+          reply_to_message_id: messageId,
+          parse_mode: 'HTML',
+        }).catch(() => {});
+      }
 
       // Record event and alert admin
       const event = await fileEventRepository.createFileEvent({
@@ -208,15 +210,16 @@ export class FileProtectionService {
       });
 
       const locale = getChatLanguage(chatId, ctx.from?.language_code);
-
-      // 5. Send concise user-facing explanation in the chat
       const userMessage = this.analysisService.formatUserAlert(analysisResult, locale);
+
+      // 5. In Silent Mode or in Business chats, do not reply into the chat
       const businessConnId = (ctx as any).businessMessage?.business_connection_id;
-      await ctx.reply(userMessage, {
-        ...(businessConnId ? { business_connection_id: businessConnId } : {}),
-        reply_to_message_id: messageId,
-        parse_mode: 'HTML',
-      });
+      if (ctx.chat.type === 'private' && !businessConnId) {
+        await ctx.reply(userMessage, {
+          reply_to_message_id: messageId,
+          parse_mode: 'HTML',
+        }).catch(() => {});
+      }
 
       // 6. Send detailed report and interactive review keyboard to admins
       const chatTitle =

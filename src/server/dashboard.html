@@ -288,9 +288,20 @@
         <div class="card-header">
           <h3 class="card-title">⚡ ស្ថានភាពប្រព័ន្ធ & ការកំណត់រហ័ស</h3>
         </div>
-        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-          <button class="btn" onclick="toggleBusyMode()" id="btnBusyMode">🔄 ប្តូរស្ថានភាព Busy Mode</button>
-          <button class="btn" style="background: rgba(255,255,255,0.1);" onclick="loadAllData()">🔄 Refresh ទិន្នន័យ</button>
+        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+          <div style="padding: 0.5rem 0.85rem; border-radius: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 0.85rem;">របៀបដំណើរការ៖</span>
+            <span id="silentModeBadge" class="tag tag-success">🔇 Silent Mode (No Auto-Reply)</span>
+          </div>
+          <button class="btn" onclick="toggleAutoReply()" id="btnToggleAutoReply" style="background: rgba(255,255,255,0.08);">
+            🔄 ប្តូរស្ថានភាព Auto-Reply
+          </button>
+          <button class="btn" style="background: rgba(255,255,255,0.1);" onclick="loadAllData()">
+            🔄 Refresh ទិន្នន័យ
+          </button>
+        </div>
+        <div style="margin-top: 0.85rem; font-size: 0.825rem; color: var(--text-muted);">
+          ℹ️ <b>Silent Mode (បានបើកដំណើរការ)៖</b> Bot ដំណើរការស្ងាត់ៗ មិនផ្ញើសារឆ្លើយតប (No Reply) ទៅកាន់អ្នកដែលឆាតមកឡើយ ដោយគ្រាន់តែតាមដានសារលុប (Anti-Delete), ស្កេនមេរោគ, និងរក្សាទុកវិក្កយបត្រប៉ុណ្ណោះ។
         </div>
       </div>
 
@@ -567,10 +578,62 @@
       renderUsers(filtered);
     }
 
+    let currentAutoReplyEnabled = false;
+
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/dashboard/settings', { headers: { 'x-dashboard-key': authToken } });
+        if (!res.ok) return;
+        const data = await res.json();
+        currentAutoReplyEnabled = !!data.autoReplyEnabled;
+
+        const badge = document.getElementById('silentModeBadge');
+        const btn = document.getElementById('btnToggleAutoReply');
+        if (badge) {
+          if (!currentAutoReplyEnabled) {
+            badge.className = 'tag tag-success';
+            badge.innerText = '🔇 Silent Mode (No Auto-Reply)';
+          } else {
+            badge.className = 'tag tag-warning';
+            badge.innerText = '🔊 Auto-Reply សកម្ម (Active)';
+          }
+        }
+        if (btn) {
+          btn.innerText = currentAutoReplyEnabled ? '🔇 ប្តូរទៅ Silent Mode (បិទ Reply)' : '🔊 បើក Auto-Reply ឡើងវិញ';
+        }
+      } catch (e) {}
+    }
+
+    async function toggleAutoReply() {
+      const nextState = !currentAutoReplyEnabled;
+      const confirmMsg = nextState
+        ? 'តើអ្នកចង់បើក Auto-Reply ឱ្យ Bot ឆ្លើយតបសារវិញមែនទេ?'
+        : 'តើអ្នកចង់ដាក់ Silent Mode (មិនឱ្យ Bot ឆ្លើយតបទៅកាន់ Chat ទេ) មែនទេ?';
+      if (!confirm(confirmMsg)) return;
+
+      try {
+        await fetch('/api/dashboard/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-dashboard-key': authToken },
+          body: JSON.stringify({ key: 'AUTO_REPLY_ENABLED', value: nextState ? 'true' : 'false' })
+        });
+        await fetch('/api/dashboard/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-dashboard-key': authToken },
+          body: JSON.stringify({ key: 'BUSY_MODE', value: nextState ? 'true' : 'false' })
+        });
+        await loadSettings();
+        await loadAllData();
+      } catch (e) {
+        alert('បរាជ័យក្នុងការផ្លាស់ប្តូរការកំណត់');
+      }
+    }
+
     async function loadAllData() {
       const headers = { 'x-dashboard-key': authToken };
       loadUsers();
       loadDailyStats();
+      loadSettings();
       
       // Stats
       try {

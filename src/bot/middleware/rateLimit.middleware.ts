@@ -18,14 +18,16 @@ export async function rateLimitMiddleware(ctx: BotContext, next: NextFunction): 
   const isLimited = await rateLimitService.isRateLimited('user', userId);
   if (isLimited) {
     ctx.rateLimitExceeded = true;
-    // Don't flood user with rate limit alerts; only respond once per window
-    try {
-      await ctx.reply(
-        '⚡ <b>Rate Limit Exceeded:</b> You are sending messages too quickly. Please slow down and wait a few seconds.',
-        { parse_mode: 'HTML' }
-      );
-    } catch {
-      // Ignore if cannot send
+    // Don't reply in personal business chats
+    if (!ctx.businessMessage) {
+      try {
+        await ctx.reply(
+          '⚡ <b>Rate Limit Exceeded:</b> You are sending messages too quickly. Please slow down and wait a few seconds.',
+          { parse_mode: 'HTML' }
+        );
+      } catch {
+        // Ignore if cannot send
+      }
     }
     return;
   }

@@ -80,23 +80,13 @@ export async function handleBusinessTextMessage(ctx: BotContext): Promise<void> 
       chatId: String(msg.chat.id),
     });
 
-    // Send safety reply to sender if replying is enabled
-    try {
-      await ctx.reply(
-        `⚠️ <b>ប្រព័ន្ធសុវត្ថិភាពបានរកឃើញថា តំណភ្ជាប់ (Link) ដែលអ្នកបានផ្ញើមកអាចមានហានិភ័យ Phishing / Scam។</b>\nសូមកុំផ្ញើតំណភ្ជាប់មិនច្បាស់លាស់។`,
-        {
-          business_connection_id: msg.business_connection_id,
-          reply_to_message_id: msg.message_id,
-          parse_mode: 'HTML',
-        }
-      );
-    } catch {
-      // ignore reply error
-    }
+    // In Silent Mode, do NOT reply into the chat to the sender
     return;
   }
 
-  if (!env.AUTO_REPLY_ENABLED) return;
+  // Silent Mode check: Do not send any automated replies in chats unless explicitly enabled
+  const isAutoReplyAllowed = await autoReplyService.isAutoReplyEnabled();
+  if (!isAutoReplyAllowed) return;
 
   // Do not reply to bots
   if (msg.from?.is_bot) return;

@@ -30,7 +30,7 @@ const envSchema = z.object({
 
   AUTO_REPLY_ENABLED: z
     .string()
-    .default('true')
+    .default('false')
     .transform(v => v.toLowerCase() === 'true'),
   FILE_PROTECTION_ENABLED: z
     .string()
@@ -82,7 +82,7 @@ const envSchema = z.object({
   GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
   AI_AUTO_REPLY_ENABLED: z
     .string()
-    .default('true')
+    .default('false')
     .transform(v => v.toLowerCase() === 'true'),
 
   // VirusTotal Threat Intelligence Configuration

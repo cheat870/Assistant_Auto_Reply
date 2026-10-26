@@ -17,6 +17,7 @@ import {
   handleLogsCommand,
   handlePendingCommand,
   handleSettingsCommand,
+  handleSilentCommand,
   handleStatsCommand,
   handleUsersCommand,
 } from './commands/admin.command.js';
@@ -108,6 +109,7 @@ export function createBot(): Bot<BotContext> {
   bot.command('archive', requireAdmin, handleArchiveCommand);
   bot.command('users', requireAdmin, handleUsersCommand);
   bot.command(['report', 'daily'], requireAdmin, handleDailyReportCommand);
+  bot.command(['silent', 'autoreply'], requireAdmin, handleSilentCommand);
 
   // Keyword Management Commands
   bot.command('keywords', requireAdmin, handleKeywordsCommand);

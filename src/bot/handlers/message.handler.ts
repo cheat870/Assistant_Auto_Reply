@@ -27,11 +27,6 @@ export async function handleTextMessage(ctx: BotContext): Promise<void> {
       `❌ <b>សូមកុំចុចបើក (Don't Click) ឬបញ្ចូលលេខសម្ងាត់/Login Token របស់អ្នកជាដាច់ខាត!</b>`,
     ].join('\n');
 
-    await ctx.reply(warning, {
-      reply_to_message_id: ctx.message?.message_id,
-      parse_mode: 'HTML',
-    });
-
     if (ctx.chat) {
       await channelArchiveService.archiveSecurityThreat(ctx.api, {
         type: 'PHISHING_LINK',
@@ -43,11 +38,22 @@ export async function handleTextMessage(ctx: BotContext): Promise<void> {
         chatId: String(ctx.chat.id),
       });
     }
+
+    // Only reply with warning if it is a direct interaction with the bot itself in private
+    if (ctx.chat?.type === 'private' && !ctx.businessMessage) {
+      await ctx.reply(warning, {
+        reply_to_message_id: ctx.message?.message_id,
+        parse_mode: 'HTML',
+      });
+    }
     return;
   }
 
+  // Silent Mode check: Do not send any automated replies in chats unless explicitly enabled
+  const isAutoReplyAllowed = await autoReplyService.isAutoReplyEnabled();
+  if (!isAutoReplyAllowed) return;
+
   const env = getEnv();
-  if (!env.AUTO_REPLY_ENABLED) return;
 
   // 1. Try Smart AI Auto-Reply with Google Gemini if configured
   if (aiService.isAvailable() && env.AI_AUTO_REPLY_ENABLED) {
